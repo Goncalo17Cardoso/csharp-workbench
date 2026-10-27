@@ -33,8 +33,12 @@ export async function createFixtureSolution(
   await dotnet(dn, ['sln', sln, 'add', ...projects], dir);
   let props: string | undefined;
   if (opts.cpm) {
-    await dotnet(dn, ['new', 'packagesprops'], dir);
+    // Test setup: minimal props written directly so SDK 8 (no packagesprops template) and 10 start identically.
     props = path.join(dir, 'Directory.Packages.props');
+    await fs.writeFile(
+      props,
+      '<Project><PropertyGroup><ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally></PropertyGroup><ItemGroup/></Project>\n',
+    );
   }
   return { sln, projects, props };
 }

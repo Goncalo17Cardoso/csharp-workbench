@@ -1,7 +1,7 @@
 # dotnet CLI behavior with Central Package Management
 
-Observed with SDK 10.0.102 (macOS), `Newtonsoft.Json` 13.0.1 / 13.0.3, projects `net8.0`, fixture dir `.../My App #1`.
-Verified by `npm run test:cli` (test/integration/cli-cpm.int.test.ts). All 5 cases confirm the expected behavior.
+Observed with SDK 10.0.102 and SDK 8.0.417 (macOS), `Newtonsoft.Json` 13.0.1 / 13.0.3, projects `net8.0`, fixture dir `.../My App #1`.
+Verified by `npm run test:cli` (test/integration/cli-cpm.int.test.ts). All 5 cases confirm the expected behavior on both SDKs (SDK 8 selected by a temporary global.json in the temp parent dir).
 
 | Case | Result |
 |---|---|
@@ -16,4 +16,4 @@ Files observed after first add (cpm): `Directory.Packages.props` from `dotnet ne
 Notes
 - The VersionOverride starting state cannot be produced by the CLI; the test writes it into the csproj as setup only (the behavior under test is remove/add).
 - `dotnet new sln --format sln` is SDK 9+/10 only (SDK 10 defaults to .slnx). SDK 8.0.417 rejects `--format`; the fixture falls back to plain `dotnet new sln`.
-- SDK 8.0.417 (via global.json in the temp parent): the non-cpm case passes; the 4 cpm cases cannot run because SDK 8 has no `packagesprops` template (fixture limitation, not a CLI CPM finding). CPM behavior on 8 is unverified.
+- SDK 8.0.417: all 5 cases pass. Fixture writes a minimal Directory.Packages.props (`<Project><PropertyGroup><ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally></PropertyGroup><ItemGroup/></Project>`) as test setup on both SDKs, because SDK 8 has no `packagesprops` template. The SDK 10 file contents above came from the template; the CLI behavior is the same from the minimal file.
