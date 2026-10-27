@@ -13,6 +13,7 @@ interface Entry { panel: NugetPanel; controller: PanelController; watchers: vsco
 
 export class PanelManager {
   private panels = new Map<string, Entry>();
+  private opening = new Set<string>();
 
   constructor(
     private extensionUri: vscode.Uri,
@@ -24,8 +25,12 @@ export class PanelManager {
   open(target: Target, opts: { preselectProject?: string } = {}): void {
     const existing = this.panels.get(target.path);
     if (existing) { existing.panel.reveal(); return; }
-    void this.create(target, opts).catch((e) =>
-      vscode.window.showErrorMessage(vscode.l10n.t('Could not open the NuGet manager: {0}', e instanceof Error ? e.message : String(e))));
+    if (this.opening.has(target.path)) return;
+    this.opening.add(target.path);
+    void this.create(target, opts)
+      .catch((e) =>
+        vscode.window.showErrorMessage(vscode.l10n.t('Could not open the NuGet manager: {0}', e instanceof Error ? e.message : String(e))))
+      .finally(() => this.opening.delete(target.path));
   }
 
   dispose(): void {

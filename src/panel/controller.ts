@@ -28,11 +28,12 @@ export interface ControllerDeps {
 
 export class PanelController {
   private state: SolutionState | undefined;
-  private _busy = false;
+  private loads = 0;
+  private running = false;
 
   constructor(private deps: ControllerDeps) {}
 
-  get busy(): boolean { return this._busy; }
+  get busy(): boolean { return this.running || this.loads > 0; }
 
   private post(m: ToWebview): void {
     this.deps.post(m);
@@ -97,8 +98,7 @@ export class PanelController {
   }
 
   private async load(): Promise<void> {
-    const wasBusy = this._busy;
-    this._busy = true;
+    this.loads++;
     try {
       const { target, projects, fs, cli } = this.deps;
       const fast = await loadFastState(target, projects, fs);
@@ -116,13 +116,16 @@ export class PanelController {
       const failed = a.status === 'rejected' ? a : b.status === 'rejected' ? b : undefined;
       if (failed) throw failed.reason;
     } finally {
-      this._busy = wasBusy;
+      this.loads--;
     }
   }
 
   private async run(request: Parameters<typeof planOperation>[0]): Promise<void> {
-    if (this._busy) return;
-    this._busy = true;
+    if (this.busy) {
+      this.post({ type: 'opResult', ok: false, message: 'Another operation is in progress.' });
+      return;
+    }
+    this.running = true;
     try {
       if (!this.state) this.state = await loadFastState(this.deps.target, this.deps.projects, this.deps.fs);
       const plan = planOperation(request, this.state);
@@ -141,7 +144,7 @@ export class PanelController {
     } catch (e) {
       await this.fail(e);
     } finally {
-      this._busy = false;
+      this.running = false;
     }
   }
 }

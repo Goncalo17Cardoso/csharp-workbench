@@ -88,4 +88,30 @@ describe('PanelController', () => {
     expect(n.slice(-2)).toEqual(['busy', 'error']);
     expect(posts[posts.length - 1]).toMatchObject({ canOpenOutput: true });
   });
+
+  it('run during an in-flight load reports instead of dropping silently', async () => {
+    let release!: () => void;
+    const gate = new Promise<void>((r) => { release = r; });
+    const { c, posts, cli } = setup({ cli: { listPackages: vi.fn(async () => { await gate; return []; }) } });
+    const loading = c.handle({ type: 'ready' });
+    await new Promise((r) => setTimeout(r, 0));
+    await c.handle({ type: 'run', request: { kind: 'install', packageId: 'X', version: '1.0.0', projects: [projects[0].path] } });
+    expect(posts).toContainEqual({ type: 'opResult', ok: false, message: 'Another operation is in progress.' });
+    expect(cli.addPackage).not.toHaveBeenCalled();
+    release();
+    await loading;
+  });
+
+  it('busy stays true until both overlapping loads finish', async () => {
+    const gates: (() => void)[] = [];
+    const { c } = setup({ cli: { listPackages: vi.fn((_p: string, o?: { outdated?: boolean }) => (o?.outdated ? new Promise((r) => gates.push(() => r([]))) : Promise.resolve([]))) } });
+    const a = c.handle({ type: 'refresh' });
+    const b = c.handle({ type: 'refresh' });
+    await new Promise((r) => setTimeout(r, 0));
+    expect(gates).toHaveLength(2);
+    gates[0](); await a;
+    expect(c.busy).toBe(true);
+    gates[1](); await b;
+    expect(c.busy).toBe(false);
+  });
 });
