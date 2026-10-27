@@ -11,6 +11,9 @@ import { readPackageRefs } from '../../src/workspace/projectFiles';
 import { createFixtureSolution, type FixtureSolution } from './helpers/fixtures';
 
 const exists = (p: string) => fs.access(p).then(() => true, () => false);
+/** Looked up by package name so the test does not depend on the publisher id. */
+const ourExtension = () => vscode.extensions.all.find((e) => e.packageJSON?.name === 'csharp-workbench') as
+  vscode.Extension<ExtensionApi> | undefined;
 type Posted = { m: ToWebview; t: number };
 
 describe('C# Workbench end to end', function () {
@@ -63,7 +66,7 @@ describe('C# Workbench end to end', function () {
     root = await fs.mkdtemp(path.join(os.tmpdir(), 'csw-e2e-'));
     // Fixtures target net8.0; pin SDK 8 when a newer SDK is also installed (also exercises sdkVersion(cwd)).
     await fs.writeFile(path.join(root, 'global.json'), '{"sdk":{"version":"8.0.100","rollForward":"latestFeature"}}');
-    const ext = vscode.extensions.getExtension<ExtensionApi>('csharp-workbench.csharp-workbench');
+    const ext = ourExtension();
     assert.ok(ext, 'extension is installed in the test host');
     api = await ext.activate();
     api.onPost = (m, t) => posts.push({ m, t });
@@ -137,6 +140,6 @@ describe('C# Workbench end to end', function () {
 
   it('works without C# Dev Kit', () => {
     assert.strictEqual(vscode.extensions.getExtension('ms-dotnettools.csdevkit'), undefined);
-    assert.ok(vscode.extensions.getExtension('csharp-workbench.csharp-workbench')?.isActive);
+    assert.ok(ourExtension()?.isActive);
   });
 });
