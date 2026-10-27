@@ -40,17 +40,23 @@ export class PanelController {
     this.deps.onPost?.(m, Date.now());
   }
 
-  private async fail(e: unknown, stderr?: string): Promise<void> {
+  /** Error text shown to the user; adds the source-mapping hint when dotnet's output mentions it. */
+  private async errorText(message: string, output: string): Promise<string> {
+    if (!`${output}\n${message}`.includes('PackageSourceMapping')) return message;
+    let first: string | undefined;
+    try {
+      first = (await this.deps.cli.configPaths(dirname(this.deps.target.path)))[0];
+    } catch { /* path unknown */ }
+    return `${message}\nPackage source mapping blocked this package. Add a mapping in ${first ?? 'your nuget.config'}.`;
+  }
+
+  private async fail(e: unknown, output?: string): Promise<void> {
     const err = e instanceof Error ? e : new Error(String(e));
-    const text = stderr ?? (e instanceof DotnetError ? e.stderr : '');
-    let message = err.message;
-    if (text.includes('PackageSourceMapping')) {
-      let first: string | undefined;
-      try {
-        first = (await this.deps.cli.configPaths(dirname(this.deps.target.path)))[0];
-      } catch { /* path unknown */ }
-      message += `\nPackage source mapping blocked this package. Add a mapping in ${first ?? 'your nuget.config'}.`;
-    }
+    const text = output ?? (e instanceof DotnetError ? `${e.stderr}\n${e.stdout}` : '');
+    this.postError(await this.errorText(err.message, text));
+  }
+
+  private postError(message: string): void {
     this.post({ type: 'busy', label: null });
     this.post({ type: 'error', message, canOpenOutput: true });
   }
@@ -97,6 +103,13 @@ export class PanelController {
     return Object.fromEntries(this.deps.projects.map((p) => [p.path, row?.versions[p.path] ?? null]));
   }
 
+  private idleWaiters: (() => void)[] = [];
+
+  /** Resolves once no load is in flight. */
+  private async loadsIdle(): Promise<void> {
+    while (this.loads > 0) await new Promise<void>((r) => this.idleWaiters.push(r));
+  }
+
   private async load(): Promise<void> {
     this.loads++;
     try {
@@ -117,37 +130,56 @@ export class PanelController {
       if (failed) throw failed.reason;
     } finally {
       this.loads--;
+      if (this.loads === 0) this.idleWaiters.splice(0).forEach((r) => r());
     }
   }
 
+  /**
+   * Runs one operation. Loads in flight are awaited (not rejected); another run in flight is rejected.
+   * The final messages are posted after `running` is cleared and the post-operation reload finished,
+   * so a webview that sends the next run on `opResult` is never refused.
+   */
   private async run(request: Parameters<typeof planOperation>[0]): Promise<void> {
-    if (this.busy) {
+    if (this.running) {
       this.post({ type: 'opResult', ok: false, message: 'Another operation is in progress.' });
       return;
     }
     this.running = true;
+    let final: () => Promise<void> | void;
     try {
-      if (!this.state) this.state = await loadFastState(this.deps.target, this.deps.projects, this.deps.fs);
-      const plan = planOperation(request, this.state);
-      if (!(await this.deps.confirm(plan.summary, plan.affectsAllProjects))) {
-        this.post({ type: 'opResult', ok: false, message: 'Cancelled.' });
-        return;
-      }
-      this.post({ type: 'busy', label: plan.summary });
-      const result = await executePlan(plan, this.deps.cli, (done, total) =>
-        this.post({ type: 'busy', label: plan.summary, progress: { done, total } }));
-      if (!result.ok) {
-        const e = new Error(result.error?.message ?? 'Operation failed');
-        await this.fail(e, result.error?.stderr);
-        return;
-      }
-      this.post({ type: 'opResult', ok: true, message: plan.summary });
-      await this.load();
-      this.post({ type: 'busy', label: null });
+      final = await this.execute(request);
     } catch (e) {
-      await this.fail(e);
+      final = () => this.fail(e);
     } finally {
       this.running = false;
     }
+    await final();
+  }
+
+  /** Does the work of `run` and returns what to post once the run is over. */
+  private async execute(request: Parameters<typeof planOperation>[0]): Promise<() => Promise<void> | void> {
+    await this.loadsIdle();
+    if (!this.state) this.state = await loadFastState(this.deps.target, this.deps.projects, this.deps.fs);
+    const plan = planOperation(request, this.state);
+    if (!(await this.deps.confirm(plan.summary, plan.affectsAllProjects))) {
+      return () => this.post({ type: 'opResult', ok: false, message: 'Cancelled.' });
+    }
+    this.post({ type: 'busy', label: plan.summary });
+    const result = await executePlan(plan, this.deps.cli, (done, total) =>
+      this.post({ type: 'busy', label: plan.summary, progress: { done, total } }));
+    if (!result.ok) {
+      // Some steps may have changed project files: show the real state before reporting.
+      try { await this.load(); } catch { /* the operation error is what the user needs */ }
+      const total = plan.steps.length;
+      let message = result.error?.message ?? 'Operation failed';
+      if (result.completed > 0) message += `\n${result.completed} of ${total} steps completed.`;
+      const text = await this.errorText(message, `${result.error?.stderr ?? ''}\n${result.error?.stdout ?? ''}`);
+      return () => this.postError(text);
+    }
+    await this.load();
+    return () => {
+      this.post({ type: 'busy', label: null });
+      this.post({ type: 'opResult', ok: true, message: plan.summary });
+    };
   }
 }

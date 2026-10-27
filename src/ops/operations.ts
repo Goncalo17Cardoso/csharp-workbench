@@ -9,7 +9,7 @@ export type CliStep =
   | { op: 'add'; project: string; id: string; version: string }
   | { op: 'remove'; project: string; id: string };
 export interface OperationPlan { steps: CliStep[]; affectsAllProjects: string[]; summary: string }
-export interface OperationResult { ok: boolean; completed: number; error?: { message: string; stderr: string } }
+export interface OperationResult { ok: boolean; completed: number; error?: { message: string; stderr: string; stdout: string } }
 
 const plural = (n: number) => `${n} project${n === 1 ? '' : 's'}`;
 
@@ -93,6 +93,7 @@ export async function executePlan(
     return { ok: true, completed };
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
-    return { ok: false, completed, error: { message, stderr: e instanceof DotnetError ? e.stderr : '' } };
+    const d = e instanceof DotnetError ? e : undefined;
+    return { ok: false, completed, error: { message, stderr: d?.stderr ?? '', stdout: d?.stdout ?? '' } };
   }
 }

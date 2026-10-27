@@ -91,11 +91,11 @@ describe('executePlan', () => {
     };
     const cli = {
       addPackage: vi.fn().mockResolvedValue(undefined),
-      removePackage: vi.fn().mockRejectedValue(new DotnetError('boom', [], 1, '', 'bad stderr')),
+      removePackage: vi.fn().mockRejectedValue(new DotnetError('boom', [], 1, 'bad stdout', 'bad stderr')),
     };
     const onProgress = vi.fn();
     const r = await executePlan(plan, cli as never, onProgress);
-    expect(r).toEqual({ ok: false, completed: 1, error: { message: 'boom', stderr: 'bad stderr' } });
+    expect(r).toEqual({ ok: false, completed: 1, error: { message: 'boom', stderr: 'bad stderr', stdout: 'bad stdout' } });
     expect(onProgress).toHaveBeenCalledTimes(1);
     expect(onProgress).toHaveBeenCalledWith(1, 3);
     expect(cli.removePackage).toHaveBeenCalledTimes(1);
@@ -105,6 +105,6 @@ describe('executePlan', () => {
     const ok = await executePlan(plan, { removePackage: vi.fn().mockResolvedValue(undefined) } as never, () => {});
     expect(ok).toEqual({ ok: true, completed: 1 });
     const bad = await executePlan(plan, { removePackage: vi.fn().mockRejectedValue(new Error('x')) } as never, () => {});
-    expect(bad).toEqual({ ok: false, completed: 0, error: { message: 'x', stderr: '' } });
+    expect(bad).toEqual({ ok: false, completed: 0, error: { message: 'x', stderr: '', stdout: '' } });
   });
 });

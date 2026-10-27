@@ -8,7 +8,7 @@ const target = { kind: 'sln' as const, path: '/s/a.sln', name: 'a' };
 const projects = [{ path: '/s/A/A.csproj', name: 'A' }];
 const csproj = '<Project><ItemGroup><PackageReference Include="Serilog" Version="3.0.0" /></ItemGroup></Project>';
 
-function setup(over: { cli?: Record<string, unknown>; confirm?: boolean; client?: Partial<FeedClient> } = {}) {
+function setup(over: { cli?: Record<string, unknown>; confirm?: boolean; client?: Partial<FeedClient>; onPost?: (m: ToWebview) => void } = {}) {
   const posts: ToWebview[] = [];
   const cli = {
     restore: vi.fn(async () => {}),
@@ -26,7 +26,7 @@ function setup(over: { cli?: Record<string, unknown>; confirm?: boolean; client?
     targets: [target], target, projects,
     sources: [{ name: 'nuget.org' }],
     feeds: () => [{ source: { name: 'nuget.org', url: 'u', kind: 'v3' }, client }],
-    post: (m) => posts.push(m), confirm, openOutput: vi.fn(), switchTarget: vi.fn(),
+    post: (m) => { posts.push(m); over.onPost?.(m); }, confirm, openOutput: vi.fn(), switchTarget: vi.fn(),
   });
   return { c, cli, posts, confirm, client };
 }
@@ -74,7 +74,8 @@ describe('PanelController', () => {
   });
 
   it('source mapping failure names the nuget.config to fix', async () => {
-    const err = new DotnetError('x', [], 1, '', 'error NU1100: PackageSourceMapping blocked');
+    // `dotnet add package` prints NU1100 on stdout, not stderr.
+    const err = new DotnetError('x', [], 1, 'error NU1100: Unable to resolve. PackageSourceMapping is enabled, the following source(s) were not considered: nuget.org.', '');
     const { c, posts } = setup({ cli: { addPackage: vi.fn(async () => { throw err; }) } });
     await c.handle({ type: 'ready' });
     await c.handle({ type: 'run', request: { kind: 'install', packageId: 'X', version: '1.0.0', projects: [projects[0].path] } });
@@ -91,17 +92,87 @@ describe('PanelController', () => {
     expect(posts[posts.length - 1]).toMatchObject({ canOpenOutput: true });
   });
 
-  it('run during an in-flight load reports instead of dropping silently', async () => {
+  it('run during an in-flight load waits for it, then executes', async () => {
     let release!: () => void;
     const gate = new Promise<void>((r) => { release = r; });
     const { c, posts, cli } = setup({ cli: { listPackages: vi.fn(async () => { await gate; return []; }) } });
     const loading = c.handle({ type: 'ready' });
     await new Promise((r) => setTimeout(r, 0));
-    await c.handle({ type: 'run', request: { kind: 'install', packageId: 'X', version: '1.0.0', projects: [projects[0].path] } });
-    expect(posts).toContainEqual({ type: 'opResult', ok: false, message: 'Another operation is in progress.' });
+    const running = c.handle({ type: 'run', request: { kind: 'install', packageId: 'X', version: '1.0.0', projects: [projects[0].path] } });
+    await new Promise((r) => setTimeout(r, 0));
     expect(cli.addPackage).not.toHaveBeenCalled();
     release();
     await loading;
+    await running;
+    expect(cli.addPackage).toHaveBeenCalledTimes(1);
+    expect(posts.filter((m) => m.type === 'opResult')).toEqual([{ type: 'opResult', ok: true, message: 'Install X 1.0.0 in 1 project' }]);
+  });
+
+  it('run while another run is in flight is rejected', async () => {
+    let release!: () => void;
+    const gate = new Promise<void>((r) => { release = r; });
+    const { c, posts, cli } = setup({ cli: { addPackage: vi.fn(async () => { await gate; }) } });
+    await c.handle({ type: 'ready' });
+    const req = { type: 'run' as const, request: { kind: 'install' as const, packageId: 'X', version: '1.0.0', projects: [projects[0].path] } };
+    const first = c.handle(req);
+    await new Promise((r) => setTimeout(r, 0));
+    await c.handle(req);
+    expect(posts).toContainEqual({ type: 'opResult', ok: false, message: 'Another operation is in progress.' });
+    release();
+    await first;
+    expect(cli.addPackage).toHaveBeenCalledTimes(1);
+  });
+
+  it('sequential runs sent on each opResult (like UpdateSequence) all execute', async () => {
+    const slowList = vi.fn(() => new Promise((r) => setTimeout(() => r([{ project: projects[0], packages: [{ id: 'Serilog', resolved: '3.0.0', latest: '4.0.0' }] }]), 5)));
+    const run = (id: string) => ({ type: 'run' as const, request: { kind: 'update' as const, packageId: id, version: '4.0.0', projects: [projects[0].path] } });
+    const queue = [run('Serilog'), run('Serilog')];
+    let done!: () => void;
+    const finished = new Promise<void>((r) => { done = r; });
+    const results: ToWebview[] = [];
+    const { c, cli, posts } = setup({
+      cli: { listPackages: slowList },
+      onPost: (m) => {
+        if (m.type !== 'opResult' && m.type !== 'error') return;
+        results.push(m);
+        const next = m.type === 'opResult' && m.ok ? queue.shift() : undefined;
+        if (next) setTimeout(() => void c.handle(next), 0); else done();
+      },
+    });
+    await c.handle({ type: 'ready' });
+    void c.handle(run('Serilog'));
+    await finished;
+    expect(results).toHaveLength(3);
+    expect(results.every((m) => m.type === 'opResult' && m.ok)).toBe(true);
+    expect(cli.addPackage).toHaveBeenCalledTimes(3);
+    // opResult is posted only after the post-operation reload finished.
+    const last = posts.map((m) => m.type).lastIndexOf('opResult');
+    const lastInstalled = posts.map((m) => (m.type === 'installed' && m.confirmed ? 'ci' : '')).lastIndexOf('ci');
+    expect(lastInstalled).toBeLessThan(last);
+  });
+
+  it('partial failure reloads and reports how many steps completed', async () => {
+    let n = 0;
+    const { c, posts, cli } = setup({ cli: { addPackage: vi.fn(async () => { if (++n === 2) throw new DotnetError('boom', [], 1, '', 'bad'); }) } });
+    await c.handle({ type: 'ready' });
+    cli.listPackages.mockClear();
+    posts.length = 0;
+    await c.handle({ type: 'run', request: { kind: 'install', packageId: 'X', version: '1.0.0', projects: ['/s/A/A.csproj', '/s/B/B.csproj'] } });
+    expect(cli.listPackages).toHaveBeenCalled();
+    const iInstalled = posts.findIndex((m) => m.type === 'installed');
+    const iError = posts.findIndex((m) => m.type === 'error');
+    expect(iInstalled).toBeGreaterThan(-1);
+    expect(iInstalled).toBeLessThan(iError);
+    expect((posts[iError] as { message: string }).message).toContain('1 of 2 steps completed.');
+    expect(c.busy).toBe(false);
+  });
+
+  it('failure with no completed step does not mention steps', async () => {
+    const { c, posts } = setup({ cli: { addPackage: vi.fn(async () => { throw new DotnetError('boom', [], 1, '', 'bad'); }) } });
+    await c.handle({ type: 'ready' });
+    await c.handle({ type: 'run', request: { kind: 'install', packageId: 'X', version: '1.0.0', projects: [projects[0].path] } });
+    const e = posts.find((m) => m.type === 'error') as { message: string };
+    expect(e.message).toBe('boom');
   });
 
   it('busy stays true until both overlapping loads finish', async () => {
