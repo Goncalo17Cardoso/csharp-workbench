@@ -3,6 +3,11 @@ import type { ProjectInfo } from '../core/types';
 import type { ToHost, ToWebview } from '../panel/protocol';
 import { renderSearchList } from './views/browse';
 import { renderDetails } from './views/details';
+import { renderInstalled } from './views/installed';
+import { renderUpdates, UpdateSequence } from './views/updates';
+import { renderConsolidate } from './views/consolidate';
+import { applyBusy, setActionsDisabled, setTabCount, showError, showResult } from './chrome';
+import type { ConsolidateRow, InstalledRow, UpdateRow } from '../state/viewModel';
 
 export interface ShellRefs {
   tabs: Record<'browse' | 'installed' | 'updates' | 'consolidate', HTMLButtonElement>;
@@ -30,6 +35,7 @@ export function renderShell(root: HTMLElement): ShellRefs {
   for (const k of Object.keys(names) as (keyof typeof names)[]) {
     const b = el('button', 'tab', names[k]);
     b.dataset.tab = k;
+    b.dataset.label = names[k];
     tabs[k] = b;
     tabBar.append(b);
   }
@@ -80,6 +86,21 @@ function start(): void {
   let exhausted = false;
   let timer: ReturnType<typeof setTimeout> | undefined;
   let selectedId: string | undefined;
+  let tab: keyof ShellRefs['tabs'] = 'browse';
+  let installed: InstalledRow[] = [];
+  let installedConfirmed = true;
+  let updates: UpdateRow[] = [];
+  let consolidate: ConsolidateRow[] = [];
+  let cpm = false;
+  let busy = false;
+  const seq = new UpdateSequence(send);
+  const openOutput = () => send({ type: 'openOutput' });
+  const renderTab = () => {
+    if (tab === 'installed') renderInstalled(ui.list, installed, ui.search.value, select, installedConfirmed);
+    else if (tab === 'updates') renderUpdates(ui.list, updates, ui.search.value, seq);
+    else if (tab === 'consolidate') renderConsolidate(ui.list, consolidate, cpm, send);
+    if (busy) setActionsDisabled(root, true);
+  };
 
   const persist = () => vscode.setState({ query: ui.search.value, prerelease: ui.prerelease.checked, source: ui.source.value });
   let appending = false;
@@ -96,6 +117,7 @@ function start(): void {
   };
 
   ui.search.addEventListener('input', () => {
+    if (tab === 'installed' || tab === 'updates') { renderTab(); return; }
     clearTimeout(timer);
     timer = setTimeout(() => doSearch(false), 300);
   });
@@ -112,6 +134,9 @@ function start(): void {
     b.addEventListener('click', () => {
       Object.values(ui.tabs).forEach((x) => x.classList.toggle('on', x === b));
       root.dataset.tab = k;
+      tab = k as typeof tab;
+      if (tab === 'browse') doSearch(false);
+      else renderTab();
     });
   }
   ui.tabs.browse.classList.add('on');
@@ -138,24 +163,38 @@ function start(): void {
           renderDetails(ui.detail, m.details, m.versions, m.perProject, projects, send, preselect);
         }
         break;
+      case 'installed':
+        installed = m.rows;
+        installedConfirmed = m.confirmed;
+        if (tab === 'installed') renderTab();
+        break;
+      case 'updates':
+        updates = m.rows;
+        setTabCount(ui.tabs.updates, m.rows.length);
+        if (tab === 'updates') renderTab();
+        break;
+      case 'consolidate':
+        consolidate = m.rows;
+        cpm = m.cpm;
+        setTabCount(ui.tabs.consolidate, m.rows.length);
+        if (tab === 'consolidate') renderTab();
+        break;
       case 'busy':
-        ui.status.textContent = m.label ?? '';
+        busy = m.label !== null;
+        applyBusy(root, ui.status, m.label, m.progress);
         break;
       case 'opResult':
-        ui.status.textContent = m.message;
+        showResult(root, ui.status, m.ok, m.message, openOutput);
+        if (!m.ok) busy = false;
+        seq.onResult(m.ok);
         break;
       case 'error': {
+        busy = false;
         if (loading) {
           loading = false;
           if (appending) skip = Math.max(0, skip - PAGE);
         }
-        ui.status.textContent = m.message;
-        if (m.canOpenOutput) {
-          const b = document.createElement('button');
-          b.textContent = 'Open Output';
-          b.addEventListener('click', () => send({ type: 'openOutput' }));
-          ui.status.append(' ', b);
-        }
+        showError(root, ui.status, m.message, m.canOpenOutput, openOutput);
         break;
       }
       default:
