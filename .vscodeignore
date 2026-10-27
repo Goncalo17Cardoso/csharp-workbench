@@ -1,9 +1,10 @@
 **
-!dist/**
+!dist/extension.js
+!dist/webview/main.js
+!dist/webview/main.css
 !media/icon.png
 !l10n/**
 !package.nls.json
 !README.md
 !CHANGELOG.md
 !LICENSE
-**/*.map
