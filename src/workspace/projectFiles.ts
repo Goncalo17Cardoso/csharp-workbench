@@ -2,7 +2,8 @@ import { dirname, join } from 'node:path';
 import { XMLParser } from 'fast-xml-parser';
 import type { CpmInfo, PackageRef } from '../core/types';
 
-const parser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: '@_' });
+// Values stay strings: `1.10` must not become the number 1.1.
+const parser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: '@_', parseTagValue: false, parseAttributeValue: false });
 
 const asArray = <T>(v: T | T[] | undefined): T[] => (v === undefined ? [] : Array.isArray(v) ? v : [v]);
 

@@ -13,6 +13,17 @@ describe('readPackageRefs', () => {
     </ItemGroup></Project>`);
     expect(refs).toEqual([{ id: 'A', requested: '1.0.0' }, { id: 'B', requested: '2.0.0' }]);
   });
+  it('keeps versions as written (no number parsing)', () => {
+    const refs = readPackageRefs(`<Project><ItemGroup>
+      <PackageReference Include="A"><Version>1.10</Version></PackageReference>
+      <PackageReference Include="B" Version="2.0" />
+      <PackageReference Include="C"><Version>1e3</Version></PackageReference>
+    </ItemGroup></Project>`);
+    expect(refs.map((r) => r.requested)).toEqual(['1.10', '2.0', '1e3']);
+    const cpm = readCpm(`<Project><PropertyGroup><ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally></PropertyGroup>
+      <ItemGroup><PackageVersion Include="A"><Version>1.10</Version></PackageVersion></ItemGroup></Project>`, '/p');
+    expect(cpm?.versions.get('a')).toBe('1.10');
+  });
   it('reads VersionOverride', () => {
     const refs = readPackageRefs(fx('cpm.csproj'));
     expect(refs[1]).toEqual({ id: 'Newtonsoft.Json', requested: undefined, versionOverride: '12.0.1' });
