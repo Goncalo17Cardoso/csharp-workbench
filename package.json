@@ -11,8 +11,8 @@
   "scripts": {
     "build": "node esbuild.mjs",
     "watch": "node esbuild.mjs --watch",
-    "test:unit": "vitest run --exclude '**/*.int.test.ts' --exclude '**/node_modules/**'",
-    "test:cli": "vitest run test/integration/cli-cpm.int.test.ts",
+    "test:unit": "node scripts/vitest-safe.mjs run --exclude '**/*.int.test.ts' --exclude '**/node_modules/**'",
+    "test:cli": "node scripts/vitest-safe.mjs run test/integration/cli-cpm.int.test.ts",
     "test:int": "vscode-test"
   },
   "dependencies": {
