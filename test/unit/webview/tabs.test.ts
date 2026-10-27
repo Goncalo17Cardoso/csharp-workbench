@@ -56,6 +56,18 @@ describe('tabs', () => {
     expect(send).toHaveBeenCalledTimes(1);
   });
 
+  it('cancel empties the queue so a later opResult sends nothing', () => {
+    const send = vi.fn();
+    const seq = new UpdateSequence(send);
+    seq.start([
+      { id: 'A', current: [], latest: '2', projects: ['p'] },
+      { id: 'B', current: [], latest: '2', projects: ['p'] },
+    ]);
+    seq.cancel();
+    seq.onResult(true);
+    expect(send).toHaveBeenCalledTimes(1);
+  });
+
   it('tab counters reflect row counts', () => {
     const mk = (t: string) => { const b = document.createElement('button'); b.textContent = t; b.dataset.label = t; return b; };
     const tabs = { updates: mk('Updates'), consolidate: mk('Consolidate') };

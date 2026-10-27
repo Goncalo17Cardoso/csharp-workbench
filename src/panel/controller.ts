@@ -129,7 +129,10 @@ export class PanelController {
     try {
       if (!this.state) this.state = await loadFastState(this.deps.target, this.deps.projects, this.deps.fs);
       const plan = planOperation(request, this.state);
-      if (!(await this.deps.confirm(plan.summary, plan.affectsAllProjects))) return;
+      if (!(await this.deps.confirm(plan.summary, plan.affectsAllProjects))) {
+        this.post({ type: 'opResult', ok: false, message: 'Cancelled.' });
+        return;
+      }
       this.post({ type: 'busy', label: plan.summary });
       const result = await executePlan(plan, this.deps.cli, (done, total) =>
         this.post({ type: 'busy', label: plan.summary, progress: { done, total } }));

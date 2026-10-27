@@ -44,13 +44,15 @@ describe('PanelController', () => {
   });
 
   it('run asks confirmation with affected projects and aborts when declined', async () => {
-    const { c, cli, confirm } = setup({ confirm: false });
+    const { c, cli, confirm, posts } = setup({ confirm: false });
     await c.handle({ type: 'ready' });
     cli.addPackage.mockClear();
+    posts.length = 0;
     await c.handle({ type: 'run', request: { kind: 'update', packageId: 'Serilog', version: '4.0.0', projects: [projects[0].path] } });
     expect(confirm).toHaveBeenCalledWith(expect.stringContaining('Update Serilog'), expect.any(Array));
     expect(cli.addPackage).not.toHaveBeenCalled();
     expect(cli.removePackage).not.toHaveBeenCalled();
+    expect(posts.filter((m) => m.type === 'opResult')).toEqual([{ type: 'opResult', ok: false, message: 'Cancelled.' }]);
   });
 
   it('failed operation clears busy and posts error with canOpenOutput', async () => {

@@ -146,6 +146,7 @@ function start(): void {
     const m = e.data;
     switch (m.type) {
       case 'init':
+        seq.cancel();
         projects = m.projects;
         preselect = m.preselectProject;
         ui.target.replaceChildren(...m.targets.map((t) => new Option(t.name, t.path, false, t.path === m.current.path)));
@@ -189,6 +190,7 @@ function start(): void {
         seq.onResult(m.ok);
         break;
       case 'error': {
+        seq.cancel();
         busy = false;
         if (loading) {
           loading = false;

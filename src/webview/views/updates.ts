@@ -6,7 +6,12 @@ export class UpdateSequence {
   private queue: UpdateRow[] = [];
   constructor(private readonly send: (m: ToHost) => void) {}
 
+  cancel(): void {
+    this.queue = [];
+  }
+
   start(rows: UpdateRow[]): void {
+    this.cancel();
     this.queue = [...rows];
     this.next();
   }
