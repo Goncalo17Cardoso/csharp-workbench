@@ -175,6 +175,48 @@ describe('PanelController', () => {
     expect(e.message).toBe('boom');
   });
 
+  it('selectVersion resends the full versions list for that package', async () => {
+    const { c, posts, client } = setup({ client: { versions: vi.fn(async () => ['1.0.0', '2.0.0']) } });
+    await c.handle({ type: 'ready' });
+    await c.handle({ type: 'selectPackage', id: 'Serilog', prerelease: false, source: 'All' });
+    posts.length = 0;
+    await c.handle({ type: 'selectVersion', id: 'Serilog', version: '1.0.0' });
+    expect(posts[0]).toMatchObject({ type: 'details', versions: ['2.0.0', '1.0.0'], perProject: { [projects[0].path]: '3.0.0' } });
+    expect(client.details).toHaveBeenLastCalledWith('Serilog', '1.0.0');
+  });
+
+  it('selectPackage with a version asks details for that version', async () => {
+    const { c, client } = setup({ client: { versions: vi.fn(async () => ['1.0.0', '2.0.0']) } });
+    await c.handle({ type: 'selectPackage', id: 'Serilog', prerelease: false, source: 'All', version: '1.0.0' });
+    expect(client.details).toHaveBeenLastCalledWith('Serilog', '1.0.0');
+    await c.handle({ type: 'selectPackage', id: 'Serilog', prerelease: false, source: 'All', version: '9.9.9' });
+    expect(client.details).toHaveBeenLastCalledWith('Serilog', '2.0.0');
+  });
+
+  it('details carry VersionOverride projects and their override version (cpm)', async () => {
+    const files: Record<string, string> = {
+      '/s/A/A.csproj': '<Project><ItemGroup><PackageReference Include="Serilog" /></ItemGroup></Project>',
+      '/s/B/B.csproj': '<Project><ItemGroup><PackageReference Include="Serilog" VersionOverride="2.0.0" /></ItemGroup></Project>',
+      '/s/Directory.Packages.props': '<Project><PropertyGroup><ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally></PropertyGroup><ItemGroup><PackageVersion Include="Serilog" Version="3.0.0" /></ItemGroup></Project>',
+    };
+    const two = [{ path: '/s/A/A.csproj', name: 'A' }, { path: '/s/B/B.csproj', name: 'B' }];
+    const posts: ToWebview[] = [];
+    const client = { versions: vi.fn(async () => ['3.0.0']), details: vi.fn(async () => ({ id: 'Serilog', version: '3.0.0', description: '', dependencies: [] })) } as unknown as FeedClient;
+    const c = new PanelController({
+      cli: { listPackages: vi.fn(async () => { throw new Error('offline'); }), restore: vi.fn(), configPaths: vi.fn() } as never,
+      fs: { readFile: async (p) => files[p], exists: async (p) => p in files },
+      targets: [target], target, projects: two, sources: [],
+      feeds: () => [{ source: { name: 'n', url: 'u', kind: 'v3' }, client }],
+      post: (m) => posts.push(m), confirm: vi.fn(), openOutput: vi.fn(), switchTarget: vi.fn(),
+    });
+    await c.handle({ type: 'refresh' });
+    await c.handle({ type: 'selectPackage', id: 'serilog', prerelease: false, source: 'All' });
+    expect(posts.find((m) => m.type === 'details')).toMatchObject({
+      perProject: { '/s/A/A.csproj': '3.0.0', '/s/B/B.csproj': '2.0.0' },
+      overrides: ['/s/B/B.csproj'],
+    });
+  });
+
   it('busy stays true until both overlapping loads finish', async () => {
     const gates: (() => void)[] = [];
     const { c } = setup({ cli: { listPackages: vi.fn((_p: string, o?: { outdated?: boolean }) => (o?.outdated ? new Promise((r) => gates.push(() => r([]))) : Promise.resolve([]))) } });

@@ -6,7 +6,7 @@ import type { ConsolidateRow, InstalledRow, UpdateRow } from '../state/viewModel
 export type ToHost =
   | { type: 'ready' }
   | { type: 'search'; query: string; prerelease: boolean; source: string; skip: number }
-  | { type: 'selectPackage'; id: string; prerelease: boolean; source: string }
+  | { type: 'selectPackage'; id: string; prerelease: boolean; source: string; version?: string }
   | { type: 'selectVersion'; id: string; version: string }
   | { type: 'run'; request: OperationRequest }
   | { type: 'switchTarget'; path: string }
@@ -20,7 +20,7 @@ export type ToWebview =
   | { type: 'installed'; rows: InstalledRow[]; confirmed: boolean }
   | { type: 'updates'; rows: UpdateRow[] }
   | { type: 'consolidate'; rows: ConsolidateRow[]; cpm: boolean }
-  | { type: 'details'; details: PackageDetails; versions: string[]; perProject: Record<string, string | null> }
+  | { type: 'details'; details: PackageDetails; versions: string[]; perProject: Record<string, string | null>; overrides: string[] }
   | { type: 'busy'; label: string | null; progress?: { done: number; total: number } }
   | { type: 'opResult'; ok: boolean; message: string }
   | { type: 'error'; message: string; canOpenOutput: boolean };

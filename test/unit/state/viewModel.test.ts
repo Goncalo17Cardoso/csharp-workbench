@@ -37,6 +37,11 @@ describe('view model', () => {
     expect(row.overrides).toEqual([P('B')]);
   });
 
+  it('overridden projects show the VersionOverride before restore confirms it', () => {
+    const [row] = buildInstalledRows(mk([proj('B', [{ id: 'X', versionOverride: '2.0.0' }])], { x: '1.0.0' }));
+    expect(row.versions[P('B')]).toBe('2.0.0');
+  });
+
   it('updates merge projects and pick latest', () => {
     const rows = buildUpdateRows([
       proj('B', [{ id: 'X', resolved: '1.0.0', latest: '3.0.0' }, { id: 'Same', resolved: '1.0.0', latest: '1.0.0' }]),

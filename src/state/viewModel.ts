@@ -7,7 +7,7 @@ export interface ConsolidateRow { id: string; versions: Record<string, string>; 
 
 const byId = (a: { id: string }, b: { id: string }) =>
   a.id.toLowerCase().localeCompare(b.id.toLowerCase());
-const current = (r: PackageRef) => r.resolved ?? r.requested ?? '';
+const current = (r: PackageRef) => r.versionOverride ?? r.resolved ?? r.requested ?? '';
 const distinct = (xs: string[]) => [...new Set(xs)];
 
 /** Groups refs by lowercase id; display id comes from the first project that has it. */

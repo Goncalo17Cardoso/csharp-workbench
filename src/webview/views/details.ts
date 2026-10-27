@@ -41,6 +41,22 @@ function link(href: string, text: string): HTMLElement {
   return a;
 }
 
+export interface DetailsOptions {
+  /** Project ticked when a package is shown for the first time. */
+  preselect?: string;
+  /** Projects whose version comes from a VersionOverride. */
+  overrides?: string[];
+}
+
+/** Ticked projects and chosen version of the details panel currently shown in `el`, if it shows `id`. */
+function previousState(el: HTMLElement, id: string): { selected: Set<string>; version: string } | undefined {
+  if (el.dataset.pkg?.toLowerCase() !== id.toLowerCase()) return undefined;
+  const selected = new Set(
+    [...el.querySelectorAll<HTMLInputElement>('.projects input[type=checkbox]')].filter((b) => b.checked).map((b) => b.dataset.path ?? ''),
+  );
+  return { selected, version: el.querySelector<HTMLSelectElement>('.actions select')?.value ?? '' };
+}
+
 export function renderDetails(
   el: HTMLElement,
   d: PackageDetails,
@@ -48,9 +64,11 @@ export function renderDetails(
   perProject: Record<string, string | null>,
   projects: ProjectInfo[],
   send: (m: ToHost) => void,
-  preselect?: string,
+  opts: DetailsOptions = {},
 ): void {
+  const prev = previousState(el, d.id);
   el.replaceChildren();
+  el.dataset.pkg = d.id;
   el.append(div('title', d.id), div('muted', d.description));
 
   if (d.deprecation) {
@@ -68,6 +86,7 @@ export function renderDetails(
     el.append(b);
   }
 
+  const overrides = new Set(opts.overrides ?? []);
   const list = div('projects');
   const boxes: { box: HTMLInputElement; path: string }[] = [];
   for (const p of projects) {
@@ -75,11 +94,12 @@ export function renderDetails(
     label.className = 'chk';
     const box = document.createElement('input');
     box.type = 'checkbox';
-    box.checked = p.path === preselect;
+    box.dataset.path = p.path;
+    box.checked = prev ? prev.selected.has(p.path) : p.path === opts.preselect;
     const inst = perProject[p.path] ?? null;
     const note = document.createElement('span');
     note.className = 'muted';
-    note.textContent = inst ? `— ${inst}` : '— not installed';
+    note.textContent = inst ? `— ${inst}${overrides.has(p.path) ? ' (override)' : ''}` : '— not installed';
     label.append(box, p.name, ' ', note);
     list.append(label);
     boxes.push({ box, path: p.path });
@@ -95,7 +115,8 @@ export function renderDetails(
     o.textContent = v + (i === 0 ? ' (latest)' : '') + (installedSet.has(v) ? ' (installed)' : '');
     select.append(o);
   });
-  if (versions.includes(d.version)) select.value = d.version;
+  if (prev && versions.includes(prev.version)) select.value = prev.version;
+  else if (versions.includes(d.version)) select.value = d.version;
   const btn = document.createElement('button');
   btn.className = 'primary';
   const selected = () => boxes.filter((b) => b.box.checked).map((b) => b.path);

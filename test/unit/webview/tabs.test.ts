@@ -20,6 +20,14 @@ describe('tabs', () => {
     expect(el.textContent).toContain('confirming…');
   });
 
+  it('installed under cpm shows the override version for overridden projects', () => {
+    const el = document.createElement('div');
+    renderInstalled(el, [{ id: 'X', versions: { a: '', b: '2.0.0' }, central: '1.0.0', overrides: ['b'] }], '', () => {}, true);
+    expect(el.querySelector('.ver')!.textContent).toBe('1.0.0 (central), 2.0.0 (override)');
+    renderInstalled(el, [{ id: 'X', versions: { b: '2.0.0' }, central: '1.0.0', overrides: ['b'] }], '', () => {}, true);
+    expect(el.querySelector('.ver')!.textContent).toBe('2.0.0 (override)');
+  });
+
   it('update selected sends one run per selected package, in sequence', () => {
     const el = document.createElement('div');
     const send = vi.fn();

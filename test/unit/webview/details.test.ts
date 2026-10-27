@@ -32,7 +32,7 @@ describe('details', () => {
   const render = (extra = {}, pre?: string) => {
     const el = document.createElement('div');
     const send = vi.fn();
-    renderDetails(el, { ...details, ...extra }, ['4.2.0', '4.1.0'], { '/a/Api.csproj': null, '/a/Core.csproj': '3.1.1' }, projects, send, pre);
+    renderDetails(el, { ...details, ...extra }, ['4.2.0', '4.1.0'], { '/a/Api.csproj': null, '/a/Core.csproj': '3.1.1' }, projects, send, { preselect: pre });
     return { el, send };
   };
   it('checkboxes show installed version or not installed', () => {
@@ -67,5 +67,42 @@ describe('details', () => {
     expect(el.querySelectorAll('a')).toHaveLength(1);
     expect(el.querySelector('a')!.getAttribute('href')).toBe('https://ok.example/a');
     expect(el.textContent).toContain('Project');
+  });
+  it('keeps chosen version and ticked projects when the same package is re-rendered', () => {
+    const el = document.createElement('div');
+    const send = vi.fn();
+    const per = { '/a/Api.csproj': null, '/a/Core.csproj': '3.1.1' };
+    renderDetails(el, details, ['4.2.0', '4.1.0'], per, projects, send, { preselect: '/a/Api.csproj' });
+    const boxes = () => el.querySelectorAll<HTMLInputElement>('.projects input[type=checkbox]');
+    boxes()[1].click();
+    const sel = el.querySelector<HTMLSelectElement>('.actions select')!;
+    sel.value = '4.1.0';
+    sel.dispatchEvent(new Event('change'));
+    expect(send).toHaveBeenCalledWith({ type: 'selectVersion', id: 'Serilog', version: '4.1.0' });
+    // Host reply for the chosen version: full list again, details for 4.1.0.
+    renderDetails(el, { ...details, version: '4.1.0' }, ['4.2.0', '4.1.0'], per, projects, send, { preselect: '/a/Api.csproj' });
+    expect([...boxes()].map((b) => b.checked)).toEqual([true, true]);
+    const opts = [...el.querySelectorAll<HTMLOptionElement>('.actions option')].map((o) => o.textContent);
+    expect(opts).toEqual(['4.2.0 (latest)', '4.1.0']);
+    expect(el.querySelector<HTMLSelectElement>('.actions select')!.value).toBe('4.1.0');
+    // Refresh after an operation: details for latest, but the user's choice is kept.
+    renderDetails(el, details, ['4.2.0', '4.1.0'], per, projects, send, { preselect: '/a/Api.csproj' });
+    expect(el.querySelector<HTMLSelectElement>('.actions select')!.value).toBe('4.1.0');
+    expect([...boxes()].map((b) => b.checked)).toEqual([true, true]);
+  });
+  it('a different package starts from the preselected project', () => {
+    const el = document.createElement('div');
+    const per = { '/a/Api.csproj': null, '/a/Core.csproj': null };
+    renderDetails(el, details, ['4.2.0'], per, projects, vi.fn(), { preselect: '/a/Api.csproj' });
+    el.querySelectorAll<HTMLInputElement>('.projects input[type=checkbox]')[1].click();
+    renderDetails(el, { ...details, id: 'Other' }, ['1.0.0'], per, projects, vi.fn(), { preselect: '/a/Api.csproj' });
+    expect([...el.querySelectorAll<HTMLInputElement>('.projects input[type=checkbox]')].map((b) => b.checked)).toEqual([true, false]);
+  });
+  it('marks projects whose version comes from a VersionOverride', () => {
+    const el = document.createElement('div');
+    renderDetails(el, details, ['4.2.0'], { '/a/Api.csproj': '4.2.0', '/a/Core.csproj': '3.1.1' }, projects, vi.fn(), { overrides: ['/a/Core.csproj'] });
+    const labels = [...el.querySelectorAll('.projects label')].map((l) => l.textContent);
+    expect(labels[0]).not.toContain('(override)');
+    expect(labels[1]).toContain('3.1.1 (override)');
   });
 });

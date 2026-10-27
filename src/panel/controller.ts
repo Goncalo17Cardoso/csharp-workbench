@@ -1,6 +1,6 @@
 import { dirname } from 'node:path';
 import type { PackageSource, ProjectInfo, SolutionState, Target } from '../core/types';
-import { maxVersion } from '../core/version';
+import { isPrerelease, maxVersion } from '../core/version';
 import type { DotnetCli } from '../dotnet/cli';
 import { DotnetError } from '../dotnet/exec';
 import { detailsFirst, searchAll, versionsAll } from '../nuget/aggregate';
@@ -30,6 +30,7 @@ export class PanelController {
   private state: SolutionState | undefined;
   private loads = 0;
   private running = false;
+  private versions: { id: string; source: string; versions: string[] } | undefined;
 
   constructor(private deps: ControllerDeps) {}
 
@@ -80,13 +81,19 @@ export class PanelController {
         case 'selectPackage': {
           const clients = this.deps.feeds(msg.source);
           const versions = await versionsAll(clients, msg.id, msg.prerelease);
-          const details = await detailsFirst(clients, msg.id, maxVersion(versions) ?? '');
-          this.post({ type: 'details', details, versions, perProject: this.perProject(msg.id) });
+          this.versions = { id: msg.id.toLowerCase(), source: msg.source, versions };
+          const version = msg.version && versions.includes(msg.version) ? msg.version : maxVersion(versions) ?? '';
+          const details = await detailsFirst(clients, msg.id, version);
+          this.post({ type: 'details', details, versions, ...this.installedIn(msg.id) });
           return;
         }
         case 'selectVersion': {
-          const details = await detailsFirst(this.deps.feeds('All'), msg.id, msg.version);
-          this.post({ type: 'details', details, versions: [], perProject: this.perProject(msg.id) });
+          // Resend the list from the last selectPackage so the dropdown keeps every version.
+          const cached = this.versions?.id === msg.id.toLowerCase() ? this.versions : undefined;
+          const clients = this.deps.feeds(cached?.source ?? 'All');
+          const versions = cached?.versions ?? await versionsAll(clients, msg.id, isPrerelease(msg.version));
+          const details = await detailsFirst(clients, msg.id, msg.version);
+          this.post({ type: 'details', details, versions, ...this.installedIn(msg.id) });
           return;
         }
         case 'run': return await this.run(msg.request);
@@ -98,9 +105,17 @@ export class PanelController {
     }
   }
 
-  private perProject(id: string): Record<string, string | null> {
+  /** Version per project (null when not referenced) and the projects that use a VersionOverride. */
+  private installedIn(id: string): { perProject: Record<string, string | null>; overrides: string[] } {
     const row = this.state ? buildInstalledRows(this.state).find((r) => r.id.toLowerCase() === id.toLowerCase()) : undefined;
-    return Object.fromEntries(this.deps.projects.map((p) => [p.path, row?.versions[p.path] ?? null]));
+    const version = (p: string): string | null => {
+      if (!row || !(p in row.versions)) return null;
+      return row.versions[p] || row.central || null;
+    };
+    return {
+      perProject: Object.fromEntries(this.deps.projects.map((p) => [p.path, version(p.path)])),
+      overrides: row?.overrides ?? [],
+    };
   }
 
   private idleWaiters: (() => void)[] = [];

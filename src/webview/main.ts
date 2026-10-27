@@ -111,9 +111,9 @@ function start(): void {
     persist();
     send({ type: 'search', query: ui.search.value, prerelease: ui.prerelease.checked, source: ui.source.value, skip });
   };
-  const select = (id: string) => {
+  const select = (id: string, version?: string) => {
     selectedId = id;
-    send({ type: 'selectPackage', id, prerelease: ui.prerelease.checked, source: ui.source.value });
+    send({ type: 'selectPackage', id, prerelease: ui.prerelease.checked, source: ui.source.value, ...(version ? { version } : {}) });
   };
 
   ui.search.addEventListener('input', () => {
@@ -161,13 +161,18 @@ function start(): void {
         break;
       case 'details':
         if (selectedId === undefined || m.details.id.toLowerCase() === selectedId.toLowerCase()) {
-          renderDetails(ui.detail, m.details, m.versions, m.perProject, projects, send, preselect);
+          renderDetails(ui.detail, m.details, m.versions, m.perProject, projects, send, { preselect, overrides: m.overrides });
+          if (busy) setActionsDisabled(root, true);
         }
         break;
       case 'installed':
         installed = m.rows;
         installedConfirmed = m.confirmed;
         if (tab === 'installed') renderTab();
+        // After an operation (or any reload) refresh the details panel; it keeps the chosen version and ticks.
+        if (m.confirmed && selectedId !== undefined) {
+          select(selectedId, ui.detail.querySelector<HTMLSelectElement>('.actions select')?.value);
+        }
         break;
       case 'updates':
         updates = m.rows;

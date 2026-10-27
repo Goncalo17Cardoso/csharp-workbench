@@ -1,5 +1,17 @@
 import type { InstalledRow } from '../../state/viewModel';
 
+const distinct = (xs: string[]) => [...new Set(xs.filter(Boolean))];
+
+/** Version column: plain versions, or under CPM the central version plus any VersionOverride versions. */
+function versionText(r: InstalledRow): string {
+  if (r.central === undefined) return distinct(Object.values(r.versions)).join(', ');
+  const overridden = new Set(r.overrides);
+  const parts: string[] = [];
+  if (Object.keys(r.versions).some((p) => !overridden.has(p))) parts.push(`${r.central} (central)`);
+  for (const v of distinct(r.overrides.map((p) => r.versions[p] ?? ''))) parts.push(`${v} (override)`);
+  return parts.join(', ');
+}
+
 export function renderInstalled(
   el: HTMLElement,
   rows: InstalledRow[],
@@ -24,8 +36,7 @@ export function renderInstalled(
     name.textContent = r.id;
     const ver = document.createElement('span');
     ver.className = 'ver';
-    const distinct = [...new Set(Object.values(r.versions))];
-    ver.textContent = r.central !== undefined ? `${r.central} (central)` : distinct.join(', ');
+    ver.textContent = versionText(r);
     row.append(name, ver);
     row.addEventListener('click', () => {
       el.querySelectorAll('.row.sel').forEach((x) => x.classList.remove('sel'));
