@@ -1,7 +1,7 @@
 import './styles.css';
 import type { ProjectInfo } from '../core/types';
 import type { ToHost, ToWebview } from '../panel/protocol';
-import { renderSearchList } from './views/browse';
+import { renderSearchList, SearchPager } from './views/browse';
 import { renderDetails } from './views/details';
 import { renderInstalled } from './views/installed';
 import { renderUpdates, UpdateSequence } from './views/updates';
@@ -81,9 +81,7 @@ function start(): void {
 
   let projects: ProjectInfo[] = [];
   let preselect: string | undefined;
-  let skip = 0;
-  let loading = false;
-  let exhausted = false;
+  const pager = new SearchPager(PAGE);
   let timer: ReturnType<typeof setTimeout> | undefined;
   let selectedId: string | undefined;
   let tab: keyof ShellRefs['tabs'] = 'browse';
@@ -98,18 +96,20 @@ function start(): void {
   const renderTab = () => {
     if (tab === 'installed') renderInstalled(ui.list, installed, ui.search.value, select, installedConfirmed);
     else if (tab === 'updates') renderUpdates(ui.list, updates, ui.search.value, seq);
-    else if (tab === 'consolidate') renderConsolidate(ui.list, consolidate, cpm, send);
+    else if (tab === 'consolidate') renderConsolidate(ui.list, consolidate, cpm, send, ui.search.value);
     if (busy) setActionsDisabled(root, true);
   };
 
   const persist = () => vscode.setState({ query: ui.search.value, prerelease: ui.prerelease.checked, source: ui.source.value });
-  let appending = false;
   const doSearch = (append: boolean) => {
-    appending = append;
-    if (!append) { skip = 0; exhausted = false; }
-    loading = true;
     persist();
-    send({ type: 'search', query: ui.search.value, prerelease: ui.prerelease.checked, source: ui.source.value, skip });
+    const { seq, skip } = pager.begin(append);
+    send({ type: 'search', query: ui.search.value, prerelease: ui.prerelease.checked, source: ui.source.value, skip, seq });
+  };
+  /** Search options only query the feeds on Browse; other tabs filter their own rows. */
+  const searchChanged = () => {
+    if (tab === 'browse') doSearch(false);
+    else persist();
   };
   const select = (id: string, version?: string) => {
     selectedId = id;
@@ -117,16 +117,15 @@ function start(): void {
   };
 
   ui.search.addEventListener('input', () => {
-    if (tab === 'installed' || tab === 'updates') { renderTab(); return; }
     clearTimeout(timer);
+    if (tab !== 'browse') { persist(); renderTab(); return; }
     timer = setTimeout(() => doSearch(false), 300);
   });
-  ui.prerelease.addEventListener('change', () => doSearch(false));
-  ui.source.addEventListener('change', () => doSearch(false));
+  ui.prerelease.addEventListener('change', searchChanged);
+  ui.source.addEventListener('change', searchChanged);
   ui.target.addEventListener('change', () => send({ type: 'switchTarget', path: ui.target.value }));
   ui.list.addEventListener('scroll', () => {
-    if (!loading && !exhausted && ui.list.scrollTop + ui.list.clientHeight >= ui.list.scrollHeight - 40) {
-      skip += PAGE;
+    if (tab === 'browse' && pager.canPage() && ui.list.scrollTop + ui.list.clientHeight >= ui.list.scrollHeight - 40) {
       doSearch(true);
     }
   });
@@ -135,6 +134,7 @@ function start(): void {
       Object.values(ui.tabs).forEach((x) => x.classList.toggle('on', x === b));
       root.dataset.tab = k;
       tab = k as typeof tab;
+      clearTimeout(timer);
       if (tab === 'browse') doSearch(false);
       else renderTab();
     });
@@ -152,11 +152,10 @@ function start(): void {
         ui.target.replaceChildren(...m.targets.map((t) => new Option(t.name, t.path, false, t.path === m.current.path)));
         ui.source.replaceChildren(new Option('All', 'All'), ...m.sources.map((s) => new Option(s.name, s.name)));
         if (saved.source) ui.source.value = saved.source;
-        doSearch(false);
+        if (tab === 'browse') doSearch(false);
         break;
       case 'searchResults':
-        loading = false;
-        if (m.results.length === 0) exhausted = true;
+        if (!pager.accept(m.seq, m.results.length) || tab !== 'browse') break;
         renderSearchList(ui.list, m.results, m.failures, select, m.append);
         break;
       case 'details':
@@ -197,10 +196,7 @@ function start(): void {
       case 'error': {
         seq.cancel();
         busy = false;
-        if (loading) {
-          loading = false;
-          if (appending) skip = Math.max(0, skip - PAGE);
-        }
+        pager.fail();
         showError(root, ui.status, m.message, m.canOpenOutput, openOutput);
         break;
       }

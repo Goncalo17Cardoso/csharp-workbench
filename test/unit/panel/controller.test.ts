@@ -69,8 +69,8 @@ describe('PanelController', () => {
 
   it('search reports source failures alongside results', async () => {
     const { c, posts } = setup({ client: { search: vi.fn(async () => { throw new Error('401'); }) } });
-    await c.handle({ type: 'search', query: 'x', prerelease: false, source: 'All', skip: 0 });
-    expect(posts[0]).toMatchObject({ type: 'searchResults', append: false, failures: [{ source: 'nuget.org' }] });
+    await c.handle({ type: 'search', query: 'x', prerelease: false, source: 'All', skip: 0, seq: 7 });
+    expect(posts[0]).toMatchObject({ type: 'searchResults', seq: 7, append: false, failures: [{ source: 'nuget.org' }] });
   });
 
   it('source mapping failure names the nuget.config to fix', async () => {

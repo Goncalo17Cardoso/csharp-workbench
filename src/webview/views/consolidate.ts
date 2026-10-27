@@ -6,15 +6,17 @@ export function renderConsolidate(
   rows: ConsolidateRow[],
   cpm: boolean,
   send: (m: ToHost) => void,
+  filter = '',
 ): void {
   el.replaceChildren();
+  const f = filter.trim().toLowerCase();
   if (cpm) {
     const note = document.createElement('div');
     note.className = 'muted note';
     note.textContent = 'Removes VersionOverride from these projects';
     el.append(note);
   }
-  for (const r of rows) {
+  for (const r of rows.filter((x) => x.id.toLowerCase().includes(f))) {
     const row = document.createElement('div');
     row.className = 'row consolidate-row';
     const text = document.createElement('div');

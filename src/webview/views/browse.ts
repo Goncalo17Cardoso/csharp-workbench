@@ -64,3 +64,46 @@ export function renderSearchList(
     el.append(row);
   }
 }
+
+/**
+ * Browse paging state. Every request gets a sequence number that the host echoes back;
+ * only the response to the latest request is accepted, so an older response can neither
+ * replace nor append to newer results.
+ */
+export class SearchPager {
+  private seq = 0;
+  private skip = 0;
+  private loading = false;
+  private appending = false;
+  private exhausted = false;
+
+  constructor(private readonly page: number) {}
+
+  begin(append: boolean): { seq: number; skip: number; append: boolean } {
+    if (append) this.skip += this.page;
+    else { this.skip = 0; this.exhausted = false; }
+    this.loading = true;
+    this.appending = append;
+    return { seq: ++this.seq, skip: this.skip, append };
+  }
+
+  /** True when scrolling to the end may request the next page. */
+  canPage(): boolean {
+    return !this.loading && !this.exhausted;
+  }
+
+  /** Whether a response should be shown; false for responses to older requests. */
+  accept(seq: number, count: number): boolean {
+    if (seq !== this.seq) return false;
+    this.loading = false;
+    if (count === 0) this.exhausted = true;
+    return true;
+  }
+
+  /** The latest request failed; a failed page is retried on the next scroll. */
+  fail(): void {
+    if (!this.loading) return;
+    this.loading = false;
+    if (this.appending) this.skip = Math.max(0, this.skip - this.page);
+  }
+}

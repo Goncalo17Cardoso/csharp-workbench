@@ -5,7 +5,7 @@ import type { ConsolidateRow, InstalledRow, UpdateRow } from '../state/viewModel
 // Webview -> host
 export type ToHost =
   | { type: 'ready' }
-  | { type: 'search'; query: string; prerelease: boolean; source: string; skip: number }
+  | { type: 'search'; query: string; prerelease: boolean; source: string; skip: number; seq: number }
   | { type: 'selectPackage'; id: string; prerelease: boolean; source: string; version?: string }
   | { type: 'selectVersion'; id: string; version: string }
   | { type: 'run'; request: OperationRequest }
@@ -16,7 +16,7 @@ export type ToHost =
 // Host -> webview
 export type ToWebview =
   | { type: 'init'; targets: Target[]; current: Target; projects: ProjectInfo[]; sources: { name: string; warning?: string }[]; preselectProject?: string }
-  | { type: 'searchResults'; results: SearchResult[]; failures: { source: string; message: string }[]; append: boolean }
+  | { type: 'searchResults'; seq: number; results: SearchResult[]; failures: { source: string; message: string }[]; append: boolean }
   | { type: 'installed'; rows: InstalledRow[]; confirmed: boolean }
   | { type: 'updates'; rows: UpdateRow[] }
   | { type: 'consolidate'; rows: ConsolidateRow[]; cpm: boolean }

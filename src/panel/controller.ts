@@ -75,7 +75,7 @@ export class PanelController {
         case 'refresh': return await this.load();
         case 'search': {
           const r = await searchAll(this.deps.feeds(msg.source), msg.query, { prerelease: msg.prerelease, skip: msg.skip, take: 20 });
-          this.post({ type: 'searchResults', results: r.results, failures: r.failures, append: msg.skip > 0 });
+          this.post({ type: 'searchResults', seq: msg.seq, results: r.results, failures: r.failures, append: msg.skip > 0 });
           return;
         }
         case 'selectPackage': {

@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { describe, expect, it, vi } from 'vitest';
-import { formatDownloads, renderSearchList } from '../../../src/webview/views/browse';
+import { formatDownloads, renderSearchList, SearchPager } from '../../../src/webview/views/browse';
 
 const results = [
   { id: 'Serilog', description: 'Logging', latestVersion: '4.2.0', totalDownloads: 1_900_000_000, sources: ['nuget.org'] },
@@ -38,5 +38,44 @@ describe('browse', () => {
     expect(formatDownloads(9_500)).toBe('9.5K');
     expect(formatDownloads(950)).toBe('950');
     expect(formatDownloads(undefined)).toBe('');
+  });
+});
+
+describe('SearchPager', () => {
+  it('pages by 20 and stops when a page comes back empty', () => {
+    const p = new SearchPager(20);
+    const a = p.begin(false);
+    expect(a).toEqual({ seq: 1, skip: 0, append: false });
+    expect(p.canPage()).toBe(false);
+    expect(p.accept(a.seq, 20)).toBe(true);
+    expect(p.canPage()).toBe(true);
+    const b = p.begin(true);
+    expect(b).toEqual({ seq: 2, skip: 20, append: true });
+    expect(p.accept(b.seq, 0)).toBe(true);
+    expect(p.canPage()).toBe(false);
+    expect(p.begin(false)).toMatchObject({ skip: 0 });
+  });
+  it('drops responses to older requests', () => {
+    const p = new SearchPager(20);
+    const old = p.begin(false);
+    const latest = p.begin(false);
+    expect(p.accept(old.seq, 20)).toBe(false);
+    expect(p.canPage()).toBe(false);
+    expect(p.accept(latest.seq, 20)).toBe(true);
+    // A late page from the previous query can't append to the new results.
+    const page = p.begin(true);
+    p.begin(false);
+    expect(p.accept(page.seq, 20)).toBe(false);
+  });
+  it('a failed page request rolls skip back so the page is retried', () => {
+    const p = new SearchPager(20);
+    p.accept(p.begin(false).seq, 20);
+    p.begin(true);
+    p.fail();
+    expect(p.canPage()).toBe(true);
+    expect(p.begin(true).skip).toBe(20);
+    p.fail();
+    p.fail();
+    expect(p.begin(true).skip).toBe(20);
   });
 });
