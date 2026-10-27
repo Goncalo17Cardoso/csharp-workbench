@@ -17,15 +17,21 @@ export function createV3Client(source: PackageSource, http: HttpGet): FeedClient
     return JSON.parse(new TextDecoder().decode(res.body));
   }
 
+  function getIndex(): Promise<Json[]> {
+    index ??= getJson(source.url).then((d) => d.resources as Json[]).catch((e) => {
+      index = undefined;
+      throw e;
+    });
+    return index;
+  }
+
   async function resource(prefix: string, exact = false): Promise<string | undefined> {
-    index ??= getJson(source.url).then((d) => d.resources as Json[]);
-    const rs = (await index).filter((r) => (exact ? r['@type'] === prefix : String(r['@type']).startsWith(prefix)));
+    const rs = (await getIndex()).filter((r) => (exact ? r['@type'] === prefix : String(r['@type']).startsWith(prefix)));
     return rs[0]?.['@id'];
   }
 
   async function registrationBase(): Promise<string> {
-    index ??= getJson(source.url).then((d) => d.resources as Json[]);
-    const rs = (await index).filter((r) => /^RegistrationsBaseUrl\/\d/.test(r['@type']));
+    const rs = (await getIndex()).filter((r) => /^RegistrationsBaseUrl\/\d/.test(r['@type']));
     rs.sort((a, b) => compareVersions(b['@type'].split('/')[1], a['@type'].split('/')[1]));
     const id = rs[0]?.['@id'] ?? (await resource('RegistrationsBaseUrl', true));
     if (!id) { throw new FeedError(`${source.name}: no registration resource`, source.name); }

@@ -92,6 +92,17 @@ describe('v3 client', () => {
     expect((await c.details('Serilog', '4.2.0')).readme).toBeUndefined();
   });
 
+  it('retries the service index after a failed fetch', async () => {
+    let n = 0;
+    const ok = fake({ [src.url]: fx('index.json'),
+      'https://azuresearch-usnc.nuget.org/query': fx('search-serilog.json') });
+    const http: HttpGet = async (url) =>
+      (url === src.url && n++ === 0) ? { status: 503, body: new Uint8Array() } : ok(url);
+    const c = createV3Client(src, http);
+    await expect(c.search('serilog', { prerelease: false, skip: 0, take: 1 })).rejects.toBeInstanceOf(FeedError);
+    expect((await c.search('serilog', { prerelease: false, skip: 0, take: 1 }))[0].id).toBe('Serilog');
+  });
+
   it('401 throws FeedError with status 401', async () => {
     const c = createV3Client(src, fake({ [src.url]: 401 }));
     const err = await c.search('x', { prerelease: true, skip: 0, take: 1 }).catch((e) => e);
