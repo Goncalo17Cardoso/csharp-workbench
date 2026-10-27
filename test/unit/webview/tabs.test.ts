@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { renderInstalled } from '../../../src/webview/views/installed';
 import { renderUpdates, UpdateSequence } from '../../../src/webview/views/updates';
 import { renderConsolidate } from '../../../src/webview/views/consolidate';
-import { applyBusy, setTabCount, showError } from '../../../src/webview/chrome';
+import { applyBusy, setTabCount, showError, showResult } from '../../../src/webview/chrome';
 
 describe('tabs', () => {
   it('installed filter is case-insensitive', () => {
@@ -117,5 +117,57 @@ describe('tabs', () => {
     expect(status.textContent).toContain('Show output');
     showError(root, status, 'boom', false, () => {});
     expect(status.textContent).not.toContain('Show output');
+  });
+
+  it('re-enabling after busy keeps buttons disabled by their own view rule', () => {
+    const root = document.createElement('div');
+    const status = document.createElement('div');
+    const list = document.createElement('div');
+    root.append(status, list);
+    renderUpdates(list, [{ id: 'A', current: ['1'], latest: '2', projects: ['p'] }], '', new UpdateSequence(vi.fn()));
+    const btn = root.querySelector<HTMLButtonElement>('button.update-selected')!;
+    expect(btn.disabled).toBe(true);
+    applyBusy(root, status, 'Working');
+    applyBusy(root, status, null);
+    expect(btn.disabled).toBe(true);
+    showError(root, status, 'boom', false, () => {});
+    expect(btn.disabled).toBe(true);
+    // Ticking a row during busy must not re-enable the button.
+    applyBusy(root, status, 'Working');
+    root.querySelector<HTMLInputElement>('input.sel-row')!.click();
+    expect(btn.disabled).toBe(true);
+    applyBusy(root, status, null);
+    expect(btn.disabled).toBe(false);
+  });
+
+  it('cancelled result is a neutral info line without Show output', () => {
+    const root = document.createElement('div');
+    const status = document.createElement('div');
+    const b = document.createElement('button'); b.className = 'primary';
+    root.append(status, b);
+    applyBusy(root, status, 'Working');
+    showResult(root, status, false, 'Cancelled.', () => {}, true);
+    expect(status.className).toBe('status status-info');
+    expect(status.textContent).toBe('Cancelled.');
+    expect(status.querySelector('button')).toBeNull();
+    expect(b.disabled).toBe(false);
+  });
+
+  it('consolidate sends only the ticked projects and shows project names', () => {
+    const el = document.createElement('div');
+    const send = vi.fn();
+    const rows = [{ id: 'X', versions: { '/s/A/Api.csproj': '1.0.0', '/s/B/Core.csproj': '2.0.0', '/s/C/Web.csproj': '1.0.0' }, target: '2.0.0' }];
+    renderConsolidate(el, rows, false, send);
+    expect(el.textContent).toContain('Api: 1.0.0');
+    expect(el.textContent).not.toContain('/s/A');
+    const boxes = el.querySelectorAll<HTMLInputElement>('input.consolidate-project');
+    expect([...boxes].map((b) => b.checked)).toEqual([true, true, true]);
+    boxes[2].click();
+    const btn = el.querySelector<HTMLButtonElement>('button.consolidate')!;
+    btn.click();
+    expect(send).toHaveBeenCalledWith({ type: 'run', request: { kind: 'consolidate', packageId: 'X', version: '2.0.0', projects: ['/s/A/Api.csproj', '/s/B/Core.csproj'] } });
+    boxes[0].click();
+    boxes[1].click();
+    expect(btn.disabled).toBe(true);
   });
 });

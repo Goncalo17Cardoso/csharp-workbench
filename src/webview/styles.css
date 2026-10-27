@@ -40,5 +40,6 @@ button.primary:disabled { opacity: 0.5; cursor: default; }
 .readme pre { background: var(--vscode-textCodeBlock-background); padding: 8px; overflow-x: auto; }
 .status-error { background: var(--vscode-inputValidation-errorBackground); border: 1px solid var(--vscode-inputValidation-errorBorder); padding: 4px 10px; }
 .status-ok { color: var(--vscode-testing-iconPassed); }
+.status-info { color: var(--vscode-foreground); }
 .note { padding: 6px 10px; }
 .consolidate-row { cursor: default; }

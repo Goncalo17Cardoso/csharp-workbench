@@ -52,7 +52,7 @@ describe('PanelController', () => {
     expect(confirm).toHaveBeenCalledWith(expect.stringContaining('Update Serilog'), expect.any(Array));
     expect(cli.addPackage).not.toHaveBeenCalled();
     expect(cli.removePackage).not.toHaveBeenCalled();
-    expect(posts.filter((m) => m.type === 'opResult')).toEqual([{ type: 'opResult', ok: false, message: 'Cancelled.' }]);
+    expect(posts.filter((m) => m.type === 'opResult')).toEqual([{ type: 'opResult', ok: false, cancelled: true, message: 'Cancelled.' }]);
   });
 
   it('failed operation clears busy and posts error with canOpenOutput', async () => {

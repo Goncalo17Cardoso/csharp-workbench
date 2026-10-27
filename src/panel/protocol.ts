@@ -22,5 +22,5 @@ export type ToWebview =
   | { type: 'consolidate'; rows: ConsolidateRow[]; cpm: boolean }
   | { type: 'details'; details: PackageDetails; versions: string[]; perProject: Record<string, string | null>; overrides: string[] }
   | { type: 'busy'; label: string | null; progress?: { done: number; total: number } }
-  | { type: 'opResult'; ok: boolean; message: string }
+  | { type: 'opResult'; ok: boolean; message: string; cancelled?: boolean }
   | { type: 'error'; message: string; canOpenOutput: boolean };

@@ -2,6 +2,7 @@ import DOMPurify from 'dompurify';
 import { marked } from 'marked';
 import type { PackageDetails, ProjectInfo } from '../../core/types';
 import type { ToHost } from '../../panel/protocol';
+import { setOwnDisabled } from '../chrome';
 
 export type Action = 'Install' | 'Update' | 'Uninstall';
 
@@ -124,7 +125,7 @@ export function renderDetails(
   const sync = () => {
     const sel = selected();
     btn.textContent = actionFor(sel, perProject, currentVersion());
-    btn.disabled = sel.length === 0;
+    setOwnDisabled(btn, sel.length === 0);
   };
   boxes.forEach((b) => b.box.addEventListener('change', sync));
   select.addEventListener('change', () => {

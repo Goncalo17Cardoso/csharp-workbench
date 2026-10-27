@@ -105,4 +105,16 @@ describe('details', () => {
     expect(labels[0]).not.toContain('(override)');
     expect(labels[1]).toContain('3.1.1 (override)');
   });
+  it('action button stays disabled with no project ticked after busy ends', async () => {
+    const { applyBusy } = await import('../../../src/webview/chrome');
+    const root = document.createElement('div');
+    const status = document.createElement('div');
+    const el = document.createElement('div');
+    root.append(status, el);
+    renderDetails(el, details, ['4.2.0'], { '/a/Api.csproj': null, '/a/Core.csproj': null }, projects, vi.fn());
+    const btn = el.querySelector<HTMLButtonElement>('button.primary')!;
+    applyBusy(root, status, 'Working');
+    applyBusy(root, status, null);
+    expect(btn.disabled).toBe(true);
+  });
 });

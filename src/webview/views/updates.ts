@@ -1,5 +1,6 @@
 import type { ToHost } from '../../panel/protocol';
 import type { UpdateRow } from '../../state/viewModel';
+import { setOwnDisabled } from '../chrome';
 
 /** Sends one update run at a time; the next goes out only after the previous opResult is ok. */
 export class UpdateSequence {
@@ -48,7 +49,7 @@ export function renderUpdates(el: HTMLElement, rows: UpdateRow[], filter: string
   const refresh = () => {
     const n = boxes.filter((b) => b.box.checked).length;
     btn.textContent = `Update selected (${n})`;
-    btn.disabled = n === 0;
+    setOwnDisabled(btn, n === 0);
   };
   for (const r of shown) {
     const row = document.createElement('div');

@@ -189,7 +189,7 @@ function start(): void {
         applyBusy(root, ui.status, m.label, m.progress);
         break;
       case 'opResult':
-        showResult(root, ui.status, m.ok, m.message, openOutput);
+        showResult(root, ui.status, m.ok, m.message, openOutput, m.cancelled);
         if (!m.ok) busy = false;
         seq.onResult(m.ok);
         break;
