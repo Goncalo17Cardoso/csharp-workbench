@@ -3,7 +3,7 @@ import { DotnetCli } from '../../../src/dotnet/cli';
 import { DotnetError, type Exec } from '../../../src/dotnet/exec';
 
 const mk = (res = { code: 0, stdout: '', stderr: '' }) => {
-  const exec = vi.fn<Parameters<Exec>, ReturnType<Exec>>(async () => res);
+  const exec = vi.fn<Exec>(async () => res);
   const out = { log: vi.fn(), info: vi.fn() };
   return { exec, out, cli: new DotnetCli(exec as unknown as Exec, '/usr/bin/dotnet', out) };
 };
