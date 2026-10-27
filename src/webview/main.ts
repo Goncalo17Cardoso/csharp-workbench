@@ -82,7 +82,9 @@ function start(): void {
   let selectedId: string | undefined;
 
   const persist = () => vscode.setState({ query: ui.search.value, prerelease: ui.prerelease.checked, source: ui.source.value });
+  let appending = false;
   const doSearch = (append: boolean) => {
+    appending = append;
     if (!append) { skip = 0; exhausted = false; }
     loading = true;
     persist();
@@ -143,6 +145,10 @@ function start(): void {
         ui.status.textContent = m.message;
         break;
       case 'error': {
+        if (loading) {
+          loading = false;
+          if (appending) skip = Math.max(0, skip - PAGE);
+        }
         ui.status.textContent = m.message;
         if (m.canOpenOutput) {
           const b = document.createElement('button');

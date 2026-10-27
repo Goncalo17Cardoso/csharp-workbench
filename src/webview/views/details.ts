@@ -20,7 +20,21 @@ function div(cls: string, text?: string): HTMLElement {
   return d;
 }
 
-function link(href: string, text: string): HTMLAnchorElement {
+function isHttp(href: string): boolean {
+  try {
+    const p = new URL(href).protocol;
+    return p === 'http:' || p === 'https:';
+  } catch {
+    return false;
+  }
+}
+
+function link(href: string, text: string): HTMLElement {
+  if (!isHttp(href)) {
+    const s = document.createElement('span');
+    s.textContent = text;
+    return s;
+  }
   const a = document.createElement('a');
   a.href = href;
   a.textContent = text;

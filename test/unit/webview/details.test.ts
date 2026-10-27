@@ -62,4 +62,10 @@ describe('details', () => {
     const { el } = render({ deprecation: { reasons: ['Legacy'] } });
     expect(el.querySelector('.banner')).not.toBeNull();
   });
+  it('renders non-http links as plain text', () => {
+    const { el } = render({ projectUrl: 'javascript:alert(1)', vulnerabilities: [{ severity: 'High', advisoryUrl: 'https://ok.example/a' }] });
+    expect(el.querySelectorAll('a')).toHaveLength(1);
+    expect(el.querySelector('a')!.getAttribute('href')).toBe('https://ok.example/a');
+    expect(el.textContent).toContain('Project');
+  });
 });
