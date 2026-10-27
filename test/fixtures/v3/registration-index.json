@@ -1,0 +1,82 @@
+{
+ "@id": "https://api.nuget.org/v3/registration5-gz-semver2/serilog/index.json",
+ "@type": [
+  "catalog:CatalogRoot",
+  "PackageRegistration",
+  "catalog:Permalink"
+ ],
+ "commitId": "08e54476-16f4-404a-9950-cabcd76239d5",
+ "commitTimeStamp": "2026-10-23T23:08:48.9491842+00:00",
+ "count": 2,
+ "items": [
+  {
+   "@id": "https://api.nuget.org/v3/registration5-gz-semver2/serilog/page/3.0.2-dev-02042/4.3.0-dev-02358.json",
+   "@type": "catalog:CatalogPage",
+   "commitId": "c9c3f348-43d7-4acf-9be7-e64de5b853ea",
+   "commitTimeStamp": "2025-05-10T21:36:07.4962692+00:00",
+   "count": 64,
+   "lower": "3.0.2-dev-02042",
+   "upper": "4.3.0-dev-02358"
+  },
+  {
+   "@id": "https://api.nuget.org/v3/registration5-gz-semver2/serilog/page/4.3.0-dev-02360/4.4.1-dev-02453.json",
+   "@type": "catalog:CatalogPage",
+   "commitId": "08e54476-16f4-404a-9950-cabcd76239d5",
+   "commitTimeStamp": "2026-10-23T23:08:48.9491842+00:00",
+   "count": 26,
+   "lower": "4.3.0-dev-02360",
+   "upper": "4.4.1-dev-02453"
+  }
+ ],
+ "@context": {
+  "@vocab": "http://schema.nuget.org/schema#",
+  "catalog": "http://schema.nuget.org/catalog#",
+  "xsd": "http://www.w3.org/2001/XMLSchema#",
+  "items": {
+   "@id": "catalog:item",
+   "@container": "@set"
+  },
+  "commitTimeStamp": {
+   "@id": "catalog:commitTimeStamp",
+   "@type": "xsd:dateTime"
+  },
+  "commitId": {
+   "@id": "catalog:commitId"
+  },
+  "count": {
+   "@id": "catalog:count"
+  },
+  "parent": {
+   "@id": "catalog:parent",
+   "@type": "@id"
+  },
+  "tags": {
+   "@id": "tag",
+   "@container": "@set"
+  },
+  "reasons": {
+   "@container": "@set"
+  },
+  "packageTargetFrameworks": {
+   "@id": "packageTargetFramework",
+   "@container": "@set"
+  },
+  "dependencyGroups": {
+   "@id": "dependencyGroup",
+   "@container": "@set"
+  },
+  "dependencies": {
+   "@id": "dependency",
+   "@container": "@set"
+  },
+  "packageContent": {
+   "@type": "@id"
+  },
+  "published": {
+   "@type": "xsd:dateTime"
+  },
+  "registration": {
+   "@type": "@id"
+  }
+ }
+}

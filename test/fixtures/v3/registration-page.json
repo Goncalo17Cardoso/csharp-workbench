@@ -1,0 +1,302 @@
+{
+ "@id": "https://api.nuget.org/v3/registration5-gz-semver2/serilog/page/3.0.2-dev-02042/4.3.0-dev-02358.json",
+ "@type": "catalog:CatalogPage",
+ "commitId": "c9c3f348-43d7-4acf-9be7-e64de5b853ea",
+ "commitTimeStamp": "2025-05-10T21:36:07.4962692+00:00",
+ "count": 2,
+ "items": [
+  {
+   "@id": "https://api.nuget.org/v3/registration5-gz-semver2/serilog/4.1.0.json",
+   "@type": "Package",
+   "commitId": "2279109d-10f2-48c5-9b54-56276dfbc0d9",
+   "commitTimeStamp": "2024-10-22T03:40:55.7935814+00:00",
+   "catalogEntry": {
+    "@id": "https://api.nuget.org/v3/catalog0/data/2024.10.22.03.40.23/serilog.4.1.0.json",
+    "@type": "PackageDetails",
+    "authors": "Serilog Contributors",
+    "dependencyGroups": [
+     {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2024.10.22.03.40.23/serilog.4.1.0.json#dependencygroup/.netframework4.6.2",
+      "@type": "PackageDependencyGroup",
+      "dependencies": [
+       {
+        "@id": "https://api.nuget.org/v3/catalog0/data/2024.10.22.03.40.23/serilog.4.1.0.json#dependencygroup/.netframework4.6.2/system.diagnostics.diagnosticsource",
+        "@type": "PackageDependency",
+        "id": "System.Diagnostics.DiagnosticSource",
+        "range": "[8.0.1, )",
+        "registration": "https://api.nuget.org/v3/registration5-gz-semver2/system.diagnostics.diagnosticsource/index.json"
+       },
+       {
+        "@id": "https://api.nuget.org/v3/catalog0/data/2024.10.22.03.40.23/serilog.4.1.0.json#dependencygroup/.netframework4.6.2/system.threading.channels",
+        "@type": "PackageDependency",
+        "id": "System.Threading.Channels",
+        "range": "[8.0.0, )",
+        "registration": "https://api.nuget.org/v3/registration5-gz-semver2/system.threading.channels/index.json"
+       },
+       {
+        "@id": "https://api.nuget.org/v3/catalog0/data/2024.10.22.03.40.23/serilog.4.1.0.json#dependencygroup/.netframework4.6.2/system.valuetuple",
+        "@type": "PackageDependency",
+        "id": "System.ValueTuple",
+        "range": "[4.5.0, )",
+        "registration": "https://api.nuget.org/v3/registration5-gz-semver2/system.valuetuple/index.json"
+       }
+      ],
+      "targetFramework": ".NETFramework4.6.2"
+     },
+     {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2024.10.22.03.40.23/serilog.4.1.0.json#dependencygroup/.netframework4.7.1",
+      "@type": "PackageDependencyGroup",
+      "dependencies": [
+       {
+        "@id": "https://api.nuget.org/v3/catalog0/data/2024.10.22.03.40.23/serilog.4.1.0.json#dependencygroup/.netframework4.7.1/system.diagnostics.diagnosticsource",
+        "@type": "PackageDependency",
+        "id": "System.Diagnostics.DiagnosticSource",
+        "range": "[8.0.1, )",
+        "registration": "https://api.nuget.org/v3/registration5-gz-semver2/system.diagnostics.diagnosticsource/index.json"
+       },
+       {
+        "@id": "https://api.nuget.org/v3/catalog0/data/2024.10.22.03.40.23/serilog.4.1.0.json#dependencygroup/.netframework4.7.1/system.threading.channels",
+        "@type": "PackageDependency",
+        "id": "System.Threading.Channels",
+        "range": "[8.0.0, )",
+        "registration": "https://api.nuget.org/v3/registration5-gz-semver2/system.threading.channels/index.json"
+       }
+      ],
+      "targetFramework": ".NETFramework4.7.1"
+     },
+     {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2024.10.22.03.40.23/serilog.4.1.0.json#dependencygroup/net6.0",
+      "@type": "PackageDependencyGroup",
+      "targetFramework": "net6.0"
+     },
+     {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2024.10.22.03.40.23/serilog.4.1.0.json#dependencygroup/net8.0",
+      "@type": "PackageDependencyGroup",
+      "targetFramework": "net8.0"
+     },
+     {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2024.10.22.03.40.23/serilog.4.1.0.json#dependencygroup/.netstandard2.0",
+      "@type": "PackageDependencyGroup",
+      "dependencies": [
+       {
+        "@id": "https://api.nuget.org/v3/catalog0/data/2024.10.22.03.40.23/serilog.4.1.0.json#dependencygroup/.netstandard2.0/system.diagnostics.diagnosticsource",
+        "@type": "PackageDependency",
+        "id": "System.Diagnostics.DiagnosticSource",
+        "range": "[8.0.1, )",
+        "registration": "https://api.nuget.org/v3/registration5-gz-semver2/system.diagnostics.diagnosticsource/index.json"
+       },
+       {
+        "@id": "https://api.nuget.org/v3/catalog0/data/2024.10.22.03.40.23/serilog.4.1.0.json#dependencygroup/.netstandard2.0/system.threading.channels",
+        "@type": "PackageDependency",
+        "id": "System.Threading.Channels",
+        "range": "[8.0.0, )",
+        "registration": "https://api.nuget.org/v3/registration5-gz-semver2/system.threading.channels/index.json"
+       }
+      ],
+      "targetFramework": ".NETStandard2.0"
+     }
+    ],
+    "description": "Simple .NET logging with fully-structured events",
+    "iconUrl": "https://api.nuget.org/v3-flatcontainer/serilog/4.1.0/icon",
+    "id": "Serilog",
+    "language": "",
+    "licenseExpression": "Apache-2.0",
+    "licenseUrl": "https://www.nuget.org/packages/Serilog/4.1.0/license",
+    "readmeUrl": "https://www.nuget.org/packages/Serilog/4.1.0#show-readme-container",
+    "listed": true,
+    "minClientVersion": "",
+    "packageContent": "https://api.nuget.org/v3-flatcontainer/serilog/4.1.0/serilog.4.1.0.nupkg",
+    "projectUrl": "https://serilog.net/",
+    "published": "2024-10-22T03:33:45.493+00:00",
+    "requireLicenseAcceptance": false,
+    "summary": "",
+    "tags": [
+     "serilog",
+     "logging",
+     "semantic",
+     "structured"
+    ],
+    "title": "",
+    "version": "4.1.0"
+   },
+   "packageContent": "https://api.nuget.org/v3-flatcontainer/serilog/4.1.0/serilog.4.1.0.nupkg",
+   "registration": "https://api.nuget.org/v3/registration5-gz-semver2/serilog/index.json"
+  },
+  {
+   "@id": "https://api.nuget.org/v3/registration5-gz-semver2/serilog/4.2.0.json",
+   "@type": "Package",
+   "commitId": "c64f7c9e-f924-4f8f-9c57-5a2c98de8942",
+   "commitTimeStamp": "2024-12-06T04:16:44.911441+00:00",
+   "catalogEntry": {
+    "@id": "https://api.nuget.org/v3/catalog0/data/2024.12.06.04.15.39/serilog.4.2.0.json",
+    "@type": "PackageDetails",
+    "authors": "Serilog Contributors",
+    "dependencyGroups": [
+     {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2024.12.06.04.15.39/serilog.4.2.0.json#dependencygroup/.netframework4.6.2",
+      "@type": "PackageDependencyGroup",
+      "dependencies": [
+       {
+        "@id": "https://api.nuget.org/v3/catalog0/data/2024.12.06.04.15.39/serilog.4.2.0.json#dependencygroup/.netframework4.6.2/system.diagnostics.diagnosticsource",
+        "@type": "PackageDependency",
+        "id": "System.Diagnostics.DiagnosticSource",
+        "range": "[8.0.1, )",
+        "registration": "https://api.nuget.org/v3/registration5-gz-semver2/system.diagnostics.diagnosticsource/index.json"
+       },
+       {
+        "@id": "https://api.nuget.org/v3/catalog0/data/2024.12.06.04.15.39/serilog.4.2.0.json#dependencygroup/.netframework4.6.2/system.threading.channels",
+        "@type": "PackageDependency",
+        "id": "System.Threading.Channels",
+        "range": "[8.0.0, )",
+        "registration": "https://api.nuget.org/v3/registration5-gz-semver2/system.threading.channels/index.json"
+       },
+       {
+        "@id": "https://api.nuget.org/v3/catalog0/data/2024.12.06.04.15.39/serilog.4.2.0.json#dependencygroup/.netframework4.6.2/system.valuetuple",
+        "@type": "PackageDependency",
+        "id": "System.ValueTuple",
+        "range": "[4.5.0, )",
+        "registration": "https://api.nuget.org/v3/registration5-gz-semver2/system.valuetuple/index.json"
+       }
+      ],
+      "targetFramework": ".NETFramework4.6.2"
+     },
+     {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2024.12.06.04.15.39/serilog.4.2.0.json#dependencygroup/.netframework4.7.1",
+      "@type": "PackageDependencyGroup",
+      "dependencies": [
+       {
+        "@id": "https://api.nuget.org/v3/catalog0/data/2024.12.06.04.15.39/serilog.4.2.0.json#dependencygroup/.netframework4.7.1/system.diagnostics.diagnosticsource",
+        "@type": "PackageDependency",
+        "id": "System.Diagnostics.DiagnosticSource",
+        "range": "[8.0.1, )",
+        "registration": "https://api.nuget.org/v3/registration5-gz-semver2/system.diagnostics.diagnosticsource/index.json"
+       },
+       {
+        "@id": "https://api.nuget.org/v3/catalog0/data/2024.12.06.04.15.39/serilog.4.2.0.json#dependencygroup/.netframework4.7.1/system.threading.channels",
+        "@type": "PackageDependency",
+        "id": "System.Threading.Channels",
+        "range": "[8.0.0, )",
+        "registration": "https://api.nuget.org/v3/registration5-gz-semver2/system.threading.channels/index.json"
+       }
+      ],
+      "targetFramework": ".NETFramework4.7.1"
+     },
+     {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2024.12.06.04.15.39/serilog.4.2.0.json#dependencygroup/net6.0",
+      "@type": "PackageDependencyGroup",
+      "targetFramework": "net6.0"
+     },
+     {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2024.12.06.04.15.39/serilog.4.2.0.json#dependencygroup/net8.0",
+      "@type": "PackageDependencyGroup",
+      "targetFramework": "net8.0"
+     },
+     {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2024.12.06.04.15.39/serilog.4.2.0.json#dependencygroup/net9.0",
+      "@type": "PackageDependencyGroup",
+      "targetFramework": "net9.0"
+     },
+     {
+      "@id": "https://api.nuget.org/v3/catalog0/data/2024.12.06.04.15.39/serilog.4.2.0.json#dependencygroup/.netstandard2.0",
+      "@type": "PackageDependencyGroup",
+      "dependencies": [
+       {
+        "@id": "https://api.nuget.org/v3/catalog0/data/2024.12.06.04.15.39/serilog.4.2.0.json#dependencygroup/.netstandard2.0/system.diagnostics.diagnosticsource",
+        "@type": "PackageDependency",
+        "id": "System.Diagnostics.DiagnosticSource",
+        "range": "[8.0.1, )",
+        "registration": "https://api.nuget.org/v3/registration5-gz-semver2/system.diagnostics.diagnosticsource/index.json"
+       },
+       {
+        "@id": "https://api.nuget.org/v3/catalog0/data/2024.12.06.04.15.39/serilog.4.2.0.json#dependencygroup/.netstandard2.0/system.threading.channels",
+        "@type": "PackageDependency",
+        "id": "System.Threading.Channels",
+        "range": "[8.0.0, )",
+        "registration": "https://api.nuget.org/v3/registration5-gz-semver2/system.threading.channels/index.json"
+       }
+      ],
+      "targetFramework": ".NETStandard2.0"
+     }
+    ],
+    "description": "Simple .NET logging with fully-structured events",
+    "iconUrl": "https://api.nuget.org/v3-flatcontainer/serilog/4.2.0/icon",
+    "id": "Serilog",
+    "language": "",
+    "licenseExpression": "Apache-2.0",
+    "licenseUrl": "https://www.nuget.org/packages/Serilog/4.2.0/license",
+    "readmeUrl": "https://www.nuget.org/packages/Serilog/4.2.0#show-readme-container",
+    "listed": true,
+    "minClientVersion": "",
+    "packageContent": "https://api.nuget.org/v3-flatcontainer/serilog/4.2.0/serilog.4.2.0.nupkg",
+    "projectUrl": "https://serilog.net/",
+    "published": "2024-12-06T04:12:49.45+00:00",
+    "requireLicenseAcceptance": false,
+    "summary": "",
+    "tags": [
+     "serilog",
+     "logging",
+     "semantic",
+     "structured"
+    ],
+    "title": "",
+    "version": "4.2.0"
+   },
+   "packageContent": "https://api.nuget.org/v3-flatcontainer/serilog/4.2.0/serilog.4.2.0.nupkg",
+   "registration": "https://api.nuget.org/v3/registration5-gz-semver2/serilog/index.json"
+  }
+ ],
+ "parent": "https://api.nuget.org/v3/registration5-gz-semver2/serilog/index.json",
+ "lower": "3.0.2-dev-02042",
+ "upper": "4.3.0-dev-02358",
+ "@context": {
+  "@vocab": "http://schema.nuget.org/schema#",
+  "catalog": "http://schema.nuget.org/catalog#",
+  "xsd": "http://www.w3.org/2001/XMLSchema#",
+  "items": {
+   "@id": "catalog:item",
+   "@container": "@set"
+  },
+  "commitTimeStamp": {
+   "@id": "catalog:commitTimeStamp",
+   "@type": "xsd:dateTime"
+  },
+  "commitId": {
+   "@id": "catalog:commitId"
+  },
+  "count": {
+   "@id": "catalog:count"
+  },
+  "parent": {
+   "@id": "catalog:parent",
+   "@type": "@id"
+  },
+  "tags": {
+   "@id": "tag",
+   "@container": "@set"
+  },
+  "reasons": {
+   "@container": "@set"
+  },
+  "packageTargetFrameworks": {
+   "@id": "packageTargetFramework",
+   "@container": "@set"
+  },
+  "dependencyGroups": {
+   "@id": "dependencyGroup",
+   "@container": "@set"
+  },
+  "dependencies": {
+   "@id": "dependency",
+   "@container": "@set"
+  },
+  "packageContent": {
+   "@type": "@id"
+  },
+  "published": {
+   "@type": "xsd:dateTime"
+  },
+  "registration": {
+   "@type": "@id"
+  }
+ }
+}
