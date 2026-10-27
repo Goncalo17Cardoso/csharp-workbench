@@ -20,11 +20,12 @@ export interface ExtensionApi extends PanelTestHooks {
 const exists = (p: string) => fsp.access(p).then(() => true, () => false);
 const MIN_SLNX_SDK = '9.0.200';
 
-export function activate(context: vscode.ExtensionContext): ExtensionApi {
+export function activate(context: vscode.ExtensionContext): ExtensionApi | undefined {
   const channel = vscode.window.createOutputChannel('C# Workbench');
   context.subscriptions.push(channel);
   const output = createOutput(channel);
-  const api: ExtensionApi = {
+  // Exports are readable by any extension, so the hooks exist only in Test mode.
+  const api: ExtensionApi | undefined = context.extensionMode !== vscode.ExtensionMode.Test ? undefined : {
     send: (targetPath, msg) => {
       if (!manager) return Promise.reject(new Error('NuGet manager is not open'));
       return manager.send(targetPath, msg);
