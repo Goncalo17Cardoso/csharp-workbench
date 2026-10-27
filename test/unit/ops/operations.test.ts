@@ -43,19 +43,29 @@ describe('planOperation', () => {
   });
   it('consolidate without cpm only touches projects on other versions', () => {
     const s = mk([proj('A', [{ id: 'Serilog', requested: '4.0.0' }]), proj('B', [{ id: 'Serilog', requested: '3.0.0' }])]);
-    const p = planOperation({ kind: 'consolidate', packageId: 'Serilog', version: '4.0.0', projects: [] }, s);
+    const p = planOperation({ kind: 'consolidate', packageId: 'Serilog', version: '4.0.0', projects: [P('A'), P('B')] }, s);
     expect(p.steps).toEqual([{ op: 'add', project: P('B'), id: 'Serilog', version: '4.0.0' }]);
     expect(p.summary).toBe('Consolidate Serilog to 4.0.0 in 1 project');
   });
   it('consolidate with cpm removes and re-adds projects with VersionOverride', () => {
     const s = mk([proj('A', [{ id: 'Serilog' }]), proj('B', [{ id: 'Serilog', versionOverride: '3.0.0' }])], { serilog: '3.5.0' });
-    const p = planOperation({ kind: 'consolidate', packageId: 'Serilog', version: '4.0.0', projects: [] }, s);
+    const p = planOperation({ kind: 'consolidate', packageId: 'Serilog', version: '4.0.0', projects: [P('A'), P('B')] }, s);
     expect(p.steps).toEqual([
       { op: 'add', project: P('A'), id: 'Serilog', version: '4.0.0' },
       { op: 'remove', project: P('B'), id: 'Serilog' },
       { op: 'add', project: P('B'), id: 'Serilog', version: '4.0.0' },
     ]);
     expect(p.affectsAllProjects).toEqual([P('A'), P('B')]);
+  });
+  it('consolidate without cpm leaves unselected projects alone', () => {
+    const s = mk([proj('A', [{ id: 'Serilog', requested: '3.0.0' }]), proj('B', [{ id: 'Serilog', requested: '3.0.0' }])]);
+    const p = planOperation({ kind: 'consolidate', packageId: 'Serilog', version: '4.0.0', projects: [P('A')] }, s);
+    expect(p.steps).toEqual([{ op: 'add', project: P('A'), id: 'Serilog', version: '4.0.0' }]);
+  });
+  it('consolidate with cpm leaves unselected override projects alone', () => {
+    const s = mk([proj('A', [{ id: 'Serilog' }]), proj('B', [{ id: 'Serilog', versionOverride: '3.0.0' }])], { serilog: '4.0.0' });
+    const p = planOperation({ kind: 'consolidate', packageId: 'Serilog', version: '4.0.0', projects: [P('A')] }, s);
+    expect(p.steps).toEqual([]);
   });
   it('uninstall removes from selected projects only', () => {
     const s = mk([proj('A', [{ id: 'Serilog' }]), proj('B', [{ id: 'Serilog' }]), proj('C', [])]);

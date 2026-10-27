@@ -37,7 +37,7 @@ export function planOperation(req: OperationRequest, state: SolutionState): Oper
     count = steps.length;
   } else if (!cpm) {
     if (kind === 'consolidate') {
-      const touched = referencing.filter((p) => {
+      const touched = referencing.filter((p) => req.projects.includes(p.project.path)).filter((p) => {
         const v = find(p)!.requested ?? find(p)!.resolved;
         return !v || compareVersions(v, version) !== 0;
       });
@@ -62,7 +62,7 @@ export function planOperation(req: OperationRequest, state: SolutionState): Oper
     const noOverride = referencing.find((p) => !find(p)!.versionOverride);
     if (central !== version && noOverride) steps.push(add(noOverride.project.path));
     for (const p of referencing) {
-      if (find(p)!.versionOverride) steps.push(remove(p.project.path), add(p.project.path));
+      if (req.projects.includes(p.project.path) && find(p)!.versionOverride) steps.push(remove(p.project.path), add(p.project.path));
     }
     affects = sortedRefs;
     count = affects.length;
