@@ -16,6 +16,7 @@
     "test:int": "vscode-test"
   },
   "dependencies": {
+    "dompurify": "^3.4.17",
     "fast-xml-parser": "^5.11.2",
     "fflate": "^0.8.3",
     "marked": "^18.1.2"

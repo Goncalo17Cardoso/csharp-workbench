@@ -11,9 +11,20 @@ const options = {
   sourcemap: true,
 };
 
+const webviewOptions = {
+  entryPoints: ['src/webview/main.ts'],
+  outfile: 'dist/webview/main.js',
+  bundle: true,
+  platform: 'browser',
+  format: 'iife',
+  target: 'es2022',
+  sourcemap: true,
+};
+
 if (process.argv.includes('--watch')) {
-  const ctx = await context(options);
-  await ctx.watch();
+  await (await context(options)).watch();
+  await (await context(webviewOptions)).watch();
 } else {
   await build(options);
+  await build(webviewOptions);
 }
