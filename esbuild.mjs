@@ -21,7 +21,20 @@ const webviewOptions = {
   sourcemap: true,
 };
 
-if (process.argv.includes('--watch')) {
+if (process.argv.includes('--tests')) {
+  // Integration tests run inside the VS Code extension host: bundle each *.e2e.test.ts to out/.
+  const { globSync } = await import('node:fs');
+  await build({
+    entryPoints: globSync('test/integration/**/*.e2e.test.ts'),
+    outdir: 'out/test/integration',
+    bundle: true,
+    platform: 'node',
+    format: 'cjs',
+    target: 'node20',
+    external: ['vscode', 'mocha'],
+    sourcemap: true,
+  });
+} else if (process.argv.includes('--watch')) {
   await (await context(options)).watch();
   await (await context(webviewOptions)).watch();
 } else {

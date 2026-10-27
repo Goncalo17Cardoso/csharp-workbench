@@ -9,6 +9,12 @@ const mk = (res = { code: 0, stdout: '', stderr: '' }) => {
 };
 
 describe('DotnetCli', () => {
+  it('sdkVersion runs in the given cwd so global.json is honoured', async () => {
+    const { cli, exec } = mk({ code: 0, stdout: '9.0.200\n', stderr: '' });
+    expect(await cli.sdkVersion('/p/My App #1')).toBe('9.0.200');
+    expect(exec).toHaveBeenCalledWith('/usr/bin/dotnet', ['--version'], expect.objectContaining({ cwd: '/p/My App #1' }));
+  });
+
   it('addPackage builds exact args', async () => {
     const { cli, exec } = mk();
     await cli.addPackage('/p/A.csproj', 'Serilog', '4.2.0');

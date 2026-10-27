@@ -1,0 +1,11 @@
+{
+  "Install .NET SDK": "Install .NET SDK",
+  "The .NET SDK was not found. Install it or set csharpWorkbench.dotnetPath.": "The .NET SDK was not found. Install it or set csharpWorkbench.dotnetPath.",
+  ".slnx solutions need .NET SDK {0} or newer (found {1}).": ".slnx solutions need .NET SDK {0} or newer (found {1}).",
+  "Select a solution or project": "Select a solution or project",
+  "No solution or project found in the workspace.": "No solution or project found in the workspace.",
+  "Could not open the NuGet manager: {0}": "Could not open the NuGet manager: {0}",
+  "This changes the central version used by:\n": "This changes the central version used by:\n",
+  "Apply": "Apply",
+  "NuGet: {0}": "NuGet: {0}"
+}

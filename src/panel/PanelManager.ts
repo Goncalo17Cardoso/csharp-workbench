@@ -8,6 +8,13 @@ import { createFeedClient } from '../nuget/feeds';
 import { createHttp } from '../nuget/http';
 import { NugetPanel } from './NugetPanel';
 import { PanelController } from './controller';
+import type { ToHost, ToWebview } from './protocol';
+
+/** Test-only hooks; production code never sets them. */
+export interface PanelTestHooks {
+  onPost?: (m: ToWebview, t: number) => void;
+  confirmOverride?: () => Promise<boolean>;
+}
 
 interface Entry { panel: NugetPanel; controller: PanelController; watchers: vscode.Disposable[] }
 
@@ -20,7 +27,15 @@ export class PanelManager {
     private cli: DotnetCli,
     private openOutput: () => void,
     private getTargets: () => Target[],
+    private hooks: PanelTestHooks = {},
   ) {}
+
+  /** Routes a message to the open panel's controller for a target (used by the integration tests). */
+  async send(targetPath: string, msg: ToHost): Promise<void> {
+    const e = this.panels.get(targetPath);
+    if (!e) throw new Error(`No open panel for ${targetPath}`);
+    await e.controller.handle(msg);
+  }
 
   open(target: Target, opts: { preselectProject?: string } = {}): void {
     const existing = this.panels.get(target.path);
@@ -64,8 +79,9 @@ export class PanelManager {
       sources: config.sources.map((s) => ({ name: s.name, warning: s.warning })),
       feeds: (name) => (name === 'All' ? clients : clients.filter((c) => c.source.name === name)),
       post: (m) => entry.panel.post(m),
+      onPost: (m, t) => this.hooks.onPost?.(m, t),
       confirm: async (summary, affected) =>
-        (await vscode.window.showWarningMessage(
+        this.hooks.confirmOverride ? this.hooks.confirmOverride() : (await vscode.window.showWarningMessage(
           summary,
           {
             modal: true,

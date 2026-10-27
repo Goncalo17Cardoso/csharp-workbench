@@ -6,6 +6,7 @@ import type { ToHost, ToWebview } from './protocol';
 export class NugetPanel {
   private panel: vscode.WebviewPanel;
   private disposables: vscode.Disposable[] = [];
+  private disposed = false;
 
   constructor(
     extensionUri: vscode.Uri,
@@ -23,6 +24,7 @@ export class NugetPanel {
     this.disposables.push(
       this.panel.webview.onDidReceiveMessage((m: ToHost) => onMessage(m)),
       this.panel.onDidDispose(() => {
+        this.disposed = true;
         this.disposables.forEach((d) => d.dispose());
         onDispose();
       }),
@@ -30,6 +32,7 @@ export class NugetPanel {
   }
 
   post(m: ToWebview): void {
+    if (this.disposed) return; // late results after the panel was closed
     void this.panel.webview.postMessage(m);
   }
 

@@ -13,7 +13,8 @@
     "watch": "node esbuild.mjs --watch",
     "test:unit": "node scripts/vitest-safe.mjs run --exclude '**/*.int.test.ts' --exclude '**/node_modules/**'",
     "test:cli": "node scripts/vitest-safe.mjs run test/integration/cli-cpm.int.test.ts",
-    "test:int": "vscode-test"
+    "test:int": "node scripts/vscode-test-safe.mjs",
+    "build:test": "node esbuild.mjs --tests"
   },
   "dependencies": {
     "dompurify": "^3.4.17",
@@ -22,13 +23,50 @@
     "marked": "^18.1.2"
   },
   "devDependencies": {
+    "@types/mocha": "^10.0.10",
     "@types/node": "^22.20.5",
     "@types/vscode": "^1.95.0",
     "@vscode/test-cli": "^0.0.15",
     "@vscode/test-electron": "^3.1.0",
     "esbuild": "^0.28.2",
     "happy-dom": "^21.0.4",
+    "mocha": "^12.0.3",
     "typescript": "^7.0.2",
     "vitest": "^3.2.7"
+  },
+  "l10n": "./l10n",
+  "contributes": {
+    "commands": [
+      {
+        "command": "csharpWorkbench.manageNuget",
+        "title": "%command.manageNuget.title%",
+        "category": "C# Workbench"
+      }
+    ],
+    "menus": {
+      "explorer/context": [
+        {
+          "command": "csharpWorkbench.manageNuget",
+          "when": "resourceExtname =~ /^\\.(sln|slnx|csproj)$/",
+          "group": "navigation@90"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "csharpWorkbench.manageNuget"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "C# Workbench",
+      "properties": {
+        "csharpWorkbench.dotnetPath": {
+          "type": "string",
+          "default": "",
+          "scope": "machine-overridable",
+          "markdownDescription": "%config.dotnetPath.description%"
+        }
+      }
+    }
   }
 }

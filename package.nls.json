@@ -1,0 +1,4 @@
+{
+  "command.manageNuget.title": "Manage NuGet Packages…",
+  "config.dotnetPath.description": "Absolute path to the `dotnet` executable. Leave empty to search `PATH` and the default install locations."
+}

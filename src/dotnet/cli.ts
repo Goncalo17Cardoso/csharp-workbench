@@ -19,8 +19,8 @@ export class DotnetCli {
     return r.stdout;
   }
 
-  async sdkVersion(): Promise<string> {
-    return parseSdkVersion(await this.run(['--version'], process.cwd()));
+  async sdkVersion(cwd: string = process.cwd()): Promise<string> {
+    return parseSdkVersion(await this.run(['--version'], cwd));
   }
 
   async slnList(slnPath: string): Promise<ProjectInfo[]> {
