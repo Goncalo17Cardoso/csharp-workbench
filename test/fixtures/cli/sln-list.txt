@@ -1,0 +1,4 @@
+Project(s)
+----------
+src/Multi/Multi.csproj
+src/My App #1/App.csproj

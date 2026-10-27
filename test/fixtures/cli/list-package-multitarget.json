@@ -1,0 +1,51 @@
+{
+  "version": 1,
+  "parameters": "",
+  "projects": [
+    {
+      "path": "/work/Demo/src/My App #1/App.csproj",
+      "frameworks": [
+        {
+          "framework": "net8.0",
+          "topLevelPackages": [
+            {
+              "id": "Newtonsoft.Json",
+              "requestedVersion": "12.0.1",
+              "resolvedVersion": "12.0.1"
+            },
+            {
+              "id": "Serilog",
+              "requestedVersion": "4.2.0",
+              "resolvedVersion": "4.2.0"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "path": "/work/Demo/src/Multi/Multi.csproj",
+      "frameworks": [
+        {
+          "framework": "net10.0",
+          "topLevelPackages": [
+            {
+              "id": "Newtonsoft.Json",
+              "requestedVersion": "13.0.3",
+              "resolvedVersion": "13.0.3"
+            }
+          ]
+        },
+        {
+          "framework": "net8.0",
+          "topLevelPackages": [
+            {
+              "id": "Newtonsoft.Json",
+              "requestedVersion": "12.0.1",
+              "resolvedVersion": "12.0.1"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

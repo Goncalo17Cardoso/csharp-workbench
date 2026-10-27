@@ -1,0 +1,70 @@
+{
+  "version": 1,
+  "parameters": "--outdated",
+  "sources": [
+    "https://api.nuget.org/v3/index.json"
+  ],
+  "projects": [
+    {
+      "path": "/work/Demo/src/My App #1/App.csproj",
+      "frameworks": [
+        {
+          "framework": "net8.0",
+          "topLevelPackages": [
+            {
+              "id": "Newtonsoft.Json",
+              "requestedVersion": "12.0.1",
+              "resolvedVersion": "12.0.1",
+              "latestVersion": "13.0.4"
+            },
+            {
+              "id": "Serilog",
+              "requestedVersion": "4.2.0",
+              "resolvedVersion": "4.2.0",
+              "latestVersion": "4.4.0"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "path": "/work/Demo/src/Multi/Multi.csproj",
+      "frameworks": [
+        {
+          "framework": "net10.0",
+          "topLevelPackages": [
+            {
+              "id": "Newtonsoft.Json",
+              "requestedVersion": "12.0.1",
+              "resolvedVersion": "12.0.1",
+              "latestVersion": "13.0.4"
+            },
+            {
+              "id": "Serilog",
+              "requestedVersion": "4.2.0",
+              "resolvedVersion": "4.2.0",
+              "latestVersion": "4.4.0"
+            }
+          ]
+        },
+        {
+          "framework": "net8.0",
+          "topLevelPackages": [
+            {
+              "id": "Newtonsoft.Json",
+              "requestedVersion": "12.0.1",
+              "resolvedVersion": "12.0.1",
+              "latestVersion": "13.0.4"
+            },
+            {
+              "id": "Serilog",
+              "requestedVersion": "4.2.0",
+              "resolvedVersion": "4.2.0",
+              "latestVersion": "4.4.0"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
