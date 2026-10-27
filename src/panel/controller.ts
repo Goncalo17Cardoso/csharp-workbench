@@ -1,4 +1,5 @@
 import { dirname } from 'node:path';
+import type { Translate } from '../core/l10n';
 import type { PackageSource, ProjectInfo, SolutionState, Target } from '../core/types';
 import { isPrerelease, maxVersion } from '../core/version';
 import type { DotnetCli } from '../dotnet/cli';
@@ -24,6 +25,8 @@ export interface ControllerDeps {
   openOutput(): void;
   switchTarget(path: string): void;
   onPost?(m: ToWebview, t: number): void;
+  /** Localises host messages (`vscode.l10n.t` in the extension). */
+  t: Translate;
 }
 
 export class PanelController {
@@ -48,7 +51,8 @@ export class PanelController {
     try {
       first = (await this.deps.cli.configPaths(dirname(this.deps.target.path)))[0];
     } catch { /* path unknown */ }
-    return `${message}\nPackage source mapping blocked this package. Add a mapping in ${first ?? 'your nuget.config'}.`;
+    const { t } = this.deps;
+    return `${message}\n${t('Package source mapping blocked this package. Add a mapping in {0}.', first ?? t('your nuget.config'))}`;
   }
 
   private async fail(e: unknown, output?: string): Promise<void> {
@@ -156,7 +160,7 @@ export class PanelController {
    */
   private async run(request: Parameters<typeof planOperation>[0]): Promise<void> {
     if (this.running) {
-      this.post({ type: 'opResult', ok: false, message: 'Another operation is in progress.' });
+      this.post({ type: 'opResult', ok: false, message: this.deps.t('Another operation is in progress.') });
       return;
     }
     this.running = true;
@@ -175,9 +179,10 @@ export class PanelController {
   private async execute(request: Parameters<typeof planOperation>[0]): Promise<() => Promise<void> | void> {
     await this.loadsIdle();
     if (!this.state) this.state = await loadFastState(this.deps.target, this.deps.projects, this.deps.fs);
-    const plan = planOperation(request, this.state);
+    const { t } = this.deps;
+    const plan = planOperation(request, this.state, t);
     if (!(await this.deps.confirm(plan.summary, plan.affectsAllProjects))) {
-      return () => this.post({ type: 'opResult', ok: false, cancelled: true, message: 'Cancelled.' });
+      return () => this.post({ type: 'opResult', ok: false, cancelled: true, message: this.deps.t('Cancelled.') });
     }
     this.post({ type: 'busy', label: plan.summary });
     const result = await executePlan(plan, this.deps.cli, (done, total) =>
@@ -186,8 +191,8 @@ export class PanelController {
       // Some steps may have changed project files: show the real state before reporting.
       try { await this.load(); } catch { /* the operation error is what the user needs */ }
       const total = plan.steps.length;
-      let message = result.error?.message ?? 'Operation failed';
-      if (result.completed > 0) message += `\n${result.completed} of ${total} steps completed.`;
+      let message = result.error?.message ?? t('Operation failed');
+      if (result.completed > 0) message += `\n${t('{0} of {1} steps completed.', result.completed, total)}`;
       const text = await this.errorText(message, `${result.error?.stderr ?? ''}\n${result.error?.stdout ?? ''}`);
       return () => this.postError(text);
     }

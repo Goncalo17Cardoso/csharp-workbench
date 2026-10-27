@@ -8,7 +8,10 @@ const target = { kind: 'sln' as const, path: '/s/a.sln', name: 'a' };
 const projects = [{ path: '/s/A/A.csproj', name: 'A' }];
 const csproj = '<Project><ItemGroup><PackageReference Include="Serilog" Version="3.0.0" /></ItemGroup></Project>';
 
-function setup(over: { cli?: Record<string, unknown>; confirm?: boolean; client?: Partial<FeedClient>; onPost?: (m: ToWebview) => void } = {}) {
+/** Same contract as vscode.l10n.t: substitutes {0}, {1}… */
+const fmt = (s: string, ...a: (string | number)[]) => s.replace(/\{(\d+)\}/g, (_, i) => String(a[Number(i)]));
+
+function setup(over: { cli?: Record<string, unknown>; confirm?: boolean; client?: Partial<FeedClient>; onPost?: (m: ToWebview) => void; t?: typeof fmt } = {}) {
   const posts: ToWebview[] = [];
   const cli = {
     restore: vi.fn(async () => {}),
@@ -26,7 +29,7 @@ function setup(over: { cli?: Record<string, unknown>; confirm?: boolean; client?
     targets: [target], target, projects,
     sources: [{ name: 'nuget.org' }],
     feeds: () => [{ source: { name: 'nuget.org', url: 'u', kind: 'v3' }, client }],
-    post: (m) => { posts.push(m); over.onPost?.(m); }, confirm, openOutput: vi.fn(), switchTarget: vi.fn(),
+    post: (m) => { posts.push(m); over.onPost?.(m); }, confirm, t: over.t ?? fmt, openOutput: vi.fn(), switchTarget: vi.fn(),
   });
   return { c, cli, posts, confirm, client };
 }
@@ -207,7 +210,7 @@ describe('PanelController', () => {
       fs: { readFile: async (p) => files[p], exists: async (p) => p in files },
       targets: [target], target, projects: two, sources: [],
       feeds: () => [{ source: { name: 'n', url: 'u', kind: 'v3' }, client }],
-      post: (m) => posts.push(m), confirm: vi.fn(), openOutput: vi.fn(), switchTarget: vi.fn(),
+      post: (m) => posts.push(m), confirm: vi.fn(), openOutput: vi.fn(), switchTarget: vi.fn(), t: fmt,
     });
     await c.handle({ type: 'refresh' });
     await c.handle({ type: 'selectPackage', id: 'serilog', prerelease: false, source: 'All' });
@@ -215,6 +218,23 @@ describe('PanelController', () => {
       perProject: { '/s/A/A.csproj': '3.0.0', '/s/B/B.csproj': '2.0.0' },
       overrides: ['/s/B/B.csproj'],
     });
+  });
+
+  it('host messages go through the translate function', async () => {
+    const t = vi.fn((s: string, ...a: (string | number)[]) => `«${fmt(s, ...a)}»`);
+    let n = 0;
+    const { c, posts, confirm } = setup({ t, confirm: true, cli: {
+      addPackage: vi.fn(async () => { if (++n === 2) throw new DotnetError('boom', [], 1, 'PackageSourceMapping is enabled', ''); }),
+      configPaths: vi.fn(async () => { throw new Error('none'); }),
+    } });
+    await c.handle({ type: 'ready' });
+    await c.handle({ type: 'run', request: { kind: 'install', packageId: 'X', version: '1.0.0', projects: ['/s/A/A.csproj', '/s/B/B.csproj'] } });
+    expect(confirm).toHaveBeenCalledWith('«Install X 1.0.0 in 2 projects»', []);
+    const e = posts.find((m) => m.type === 'error') as { message: string };
+    expect(e.message).toBe('boom\n«1 of 2 steps completed.»\n«Package source mapping blocked this package. Add a mapping in «your nuget.config».»');
+    confirm.mockResolvedValueOnce(false);
+    await c.handle({ type: 'run', request: { kind: 'install', packageId: 'X', version: '1.0.0', projects: ['/s/A/A.csproj'] } });
+    expect(posts.at(-1)).toMatchObject({ type: 'opResult', message: '«Cancelled.»' });
   });
 
   it('busy stays true until both overlapping loads finish', async () => {

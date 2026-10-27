@@ -80,6 +80,18 @@ describe('planOperation', () => {
   });
 });
 
+describe('planOperation summary translation', () => {
+  it('passes every summary through the translate function', () => {
+    const t = (s: string, ...a: (string | number)[]) => `T:${s}|${a.join(',')}`;
+    const s1 = mk([proj('A', [])]);
+    expect(planOperation({ kind: 'install', packageId: 'X', version: '1', projects: [P('A')] }, s1, t).summary)
+      .toBe('T:Install {0} {1} in 1 project|X,1');
+    const s2 = mk([proj('A', [{ id: 'X' }]), proj('B', [{ id: 'X' }])], { x: '0' });
+    expect(planOperation({ kind: 'update', packageId: 'X', version: '1', projects: [P('A')] }, s2, t).summary)
+      .toBe('T:Update {0} to {1} in {2} projects (central version)|X,1,2');
+  });
+});
+
 describe('executePlan', () => {
   it('stops at first failure and returns stderr', async () => {
     const plan: OperationPlan = {

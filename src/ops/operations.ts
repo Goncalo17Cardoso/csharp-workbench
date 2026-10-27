@@ -2,6 +2,7 @@ import type { DotnetCli } from '../dotnet/cli';
 import { DotnetError } from '../dotnet/exec';
 import { compareVersions } from '../core/version';
 import type { SolutionState } from '../core/types';
+import { format, type Translate } from '../core/l10n';
 
 export type OperationKind = 'install' | 'update' | 'uninstall' | 'consolidate';
 export interface OperationRequest { kind: OperationKind; packageId: string; version?: string; projects: string[] }
@@ -11,9 +12,7 @@ export type CliStep =
 export interface OperationPlan { steps: CliStep[]; affectsAllProjects: string[]; summary: string }
 export interface OperationResult { ok: boolean; completed: number; error?: { message: string; stderr: string; stdout: string } }
 
-const plural = (n: number) => `${n} project${n === 1 ? '' : 's'}`;
-
-export function planOperation(req: OperationRequest, state: SolutionState): OperationPlan {
+export function planOperation(req: OperationRequest, state: SolutionState, t: Translate = format): OperationPlan {
   const { kind, packageId: id } = req;
   const lid = id.toLowerCase();
   if (kind !== 'uninstall' && !req.version) throw new Error(`Version is required for ${kind}`);
@@ -68,11 +67,18 @@ export function planOperation(req: OperationRequest, state: SolutionState): Oper
     count = affects.length;
   }
 
+  const one = count === 1;
   const summary =
-    kind === 'install' ? `Install ${id} ${version} in ${plural(count)}`
-    : kind === 'update' ? `Update ${id} to ${version} in ${plural(count)}${cpm ? ' (central version)' : ''}`
-    : kind === 'uninstall' ? `Uninstall ${id} from ${plural(count)}`
-    : `Consolidate ${id} to ${version} in ${plural(count)}`;
+    kind === 'install'
+      ? (one ? t('Install {0} {1} in 1 project', id, version) : t('Install {0} {1} in {2} projects', id, version, count))
+      : kind === 'update' && cpm
+        ? (one ? t('Update {0} to {1} in 1 project (central version)', id, version)
+          : t('Update {0} to {1} in {2} projects (central version)', id, version, count))
+        : kind === 'update'
+          ? (one ? t('Update {0} to {1} in 1 project', id, version) : t('Update {0} to {1} in {2} projects', id, version, count))
+          : kind === 'uninstall'
+            ? (one ? t('Uninstall {0} from 1 project', id) : t('Uninstall {0} from {1} projects', id, count))
+            : (one ? t('Consolidate {0} to {1} in 1 project', id, version) : t('Consolidate {0} to {1} in {2} projects', id, version, count));
   return { steps, affectsAllProjects: affects, summary };
 }
 

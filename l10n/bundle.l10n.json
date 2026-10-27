@@ -7,5 +7,21 @@
   "Could not open the NuGet manager: {0}": "Could not open the NuGet manager: {0}",
   "This changes the central version used by:\n": "This changes the central version used by:\n",
   "Apply": "Apply",
-  "NuGet: {0}": "NuGet: {0}"
+  "NuGet: {0}": "NuGet: {0}",
+  "Package source mapping blocked this package. Add a mapping in {0}.": "Package source mapping blocked this package. Add a mapping in {0}.",
+  "your nuget.config": "your nuget.config",
+  "Another operation is in progress.": "Another operation is in progress.",
+  "Cancelled.": "Cancelled.",
+  "Operation failed": "Operation failed",
+  "{0} of {1} steps completed.": "{0} of {1} steps completed.",
+  "Install {0} {1} in 1 project": "Install {0} {1} in 1 project",
+  "Install {0} {1} in {2} projects": "Install {0} {1} in {2} projects",
+  "Update {0} to {1} in 1 project (central version)": "Update {0} to {1} in 1 project (central version)",
+  "Update {0} to {1} in {2} projects (central version)": "Update {0} to {1} in {2} projects (central version)",
+  "Update {0} to {1} in 1 project": "Update {0} to {1} in 1 project",
+  "Update {0} to {1} in {2} projects": "Update {0} to {1} in {2} projects",
+  "Uninstall {0} from 1 project": "Uninstall {0} from 1 project",
+  "Uninstall {0} from {1} projects": "Uninstall {0} from {1} projects",
+  "Consolidate {0} to {1} in 1 project": "Consolidate {0} to {1} in 1 project",
+  "Consolidate {0} to {1} in {2} projects": "Consolidate {0} to {1} in {2} projects"
 }

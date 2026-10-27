@@ -80,6 +80,7 @@ export class PanelManager {
       feeds: (name) => (name === 'All' ? clients : clients.filter((c) => c.source.name === name)),
       post: (m) => entry.panel.post(m),
       onPost: (m, t) => this.hooks.onPost?.(m, t),
+      t: (message, ...args) => vscode.l10n.t(message, ...args),
       confirm: async (summary, affected) =>
         this.hooks.confirmOverride ? this.hooks.confirmOverride() : (await vscode.window.showWarningMessage(
           summary,
