@@ -91,12 +91,13 @@ export function registerFileCommands(deps: Deps): vscode.Disposable[] {
     } catch (e) { fail(e); }
   }
 
-  async function addFromCatalog(node: TreeNode, shortName: string): Promise<void> {
+  async function addFromCatalog(node: TreeNode, shortName: string, preset?: string): Promise<void> {
     const folder = folderOf(node);
     const proj = projectOf(folder);
     const cli = await deps.getCli();
     if (!proj || !cli) { fail(new Error(vscode.l10n.t('The .NET SDK was not found'))); return; }
-    const name = await vscode.window.showInputBox({
+    catalog ??= new TemplateCatalog(cli);
+    const name = preset ?? await vscode.window.showInputBox({
       prompt: vscode.l10n.t('Name'),
       validateInput: (v) => { const e = validateName(v, () => false); return e ? tName(e) : undefined; },
     });
@@ -117,8 +118,10 @@ export function registerFileCommands(deps: Deps): vscode.Disposable[] {
     } catch (e) { deps.showOutput(); fail(e); }
   }
 
-  async function newItem(node?: TreeNode): Promise<void> {
+  /** `shortName` and `name` let the Test-mode API answer the prompts programmatically. */
+  async function newItem(node?: TreeNode, shortName?: string, name?: string): Promise<void> {
     if (!node) return;
+    if (typeof shortName === 'string') { await addFromCatalog(node, shortName, name); return; }
     const cli = await deps.getCli();
     const qp = vscode.window.createQuickPick<vscode.QuickPickItem & { choice?: ReturnType<typeof newItemChoices>[number] }>();
     qp.placeholder = vscode.l10n.t('Select an item template');
@@ -225,7 +228,7 @@ export function registerFileCommands(deps: Deps): vscode.Disposable[] {
   const reg = (id: string, fn: (...a: never[]) => unknown) => vscode.commands.registerCommand(`csharpWorkbench.${id}`, fn as (...a: unknown[]) => unknown);
   return [
     reg('newItem', newItem),
-    reg('newClass', (n?: TreeNode) => n && addBuiltIn(n, 'class')),
+    reg('newClass', (n?: TreeNode, name?: string) => n && addBuiltIn(n, 'class', typeof name === 'string' ? name : undefined)),
     reg('newInterface', (n?: TreeNode) => n && addBuiltIn(n, 'interface')),
     reg('newFolder', newFolder),
     reg('addExistingItem', addExisting),

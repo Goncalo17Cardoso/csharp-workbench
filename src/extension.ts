@@ -16,11 +16,14 @@ import { registerSecretsCommands } from './solution/commands/secrets';
 import { registerSolutionCommands } from './solution/commands/solution';
 import { setConfirmOverride } from './solution/confirm';
 import { SolutionTreeProvider } from './solution/SolutionTreeProvider';
+import type { SolutionTreeCore } from './solution/treeCore';
 import { selectTargets } from './workspace/targets';
 
 /** Returned from activate() for the integration tests; production code never sets the hooks. */
 export interface ExtensionApi extends PanelTestHooks {
   send(targetPath: string, msg: ToHost): Promise<void>;
+  /** Solution Explorer hooks (Test mode only). `run` executes `csharpWorkbench.<command>`. */
+  solution?: { core: SolutionTreeCore; run(command: string, ...args: unknown[]): Promise<unknown> };
 }
 
 const exists = (p: string) => fsp.access(p).then(() => true, () => false);
@@ -135,6 +138,12 @@ export function activate(context: vscode.ExtensionContext): ExtensionApi | undef
     return dotnet ? new DotnetCli(nodeExec, dotnet, output) : undefined;
   });
   context.subscriptions.push(...explorer.register());
+  if (api) {
+    api.solution = {
+      core: explorer.treeCore,
+      run: (command, ...args) => Promise.resolve(vscode.commands.executeCommand(`csharpWorkbench.${command}`, ...args)),
+    };
+  }
   setConfirmOverride(() => api?.confirmOverride);
   context.subscriptions.push(...registerFileCommands({
     provider: explorer,
