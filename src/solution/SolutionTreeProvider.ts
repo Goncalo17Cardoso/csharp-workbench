@@ -9,6 +9,7 @@ import { loadProjectItems, walkProjectDir } from './projectItems';
 import { loadSolution } from './slnParse';
 import { getSelectedSolution, getStartupProject, setSelectedSolution } from './state';
 import { SolutionTreeCore } from './treeCore';
+import { shouldInvalidate, type FsEvent } from './watchFilter';
 
 const WATCH_GLOB = '**/*.{cs,csproj,sln,slnx,props,targets,json,razor,cshtml,xaml,resx}';
 const DEBOUNCE_MS = 300;
@@ -18,7 +19,6 @@ const ICONS: Partial<Record<TreeNode['kind'], string>> = {
   frameworks: 'symbol-constant', framework: 'symbol-constant', warning: 'warning',
 };
 const readFile = (p: string) => fsp.readFile(p, 'utf8');
-const isBuildDir = (p: string) => /[\\/](bin|obj)[\\/]/.test(p);
 
 export class SolutionTreeProvider implements vscode.TreeDataProvider<TreeNode>, vscode.Disposable {
   private readonly emitter = new vscode.EventEmitter<TreeNode | undefined>();
@@ -64,11 +64,11 @@ export class SolutionTreeProvider implements vscode.TreeDataProvider<TreeNode>, 
     const folders = vscode.workspace.createFileSystemWatcher('**/*', false, true, false);
     this.disposables.push(
       this.view, this.emitter, watcher, folders,
-      watcher.onDidCreate((u) => this.queue(u.fsPath, true)),
-      watcher.onDidChange((u) => this.queue(u.fsPath, false)),
-      watcher.onDidDelete((u) => this.queue(u.fsPath, true)),
-      folders.onDidCreate((u) => this.queue(u.fsPath, false)),
-      folders.onDidDelete((u) => this.queue(u.fsPath, false)),
+      watcher.onDidCreate((u) => this.queue(u.fsPath, 'create')),
+      watcher.onDidChange((u) => this.queue(u.fsPath, 'change')),
+      watcher.onDidDelete((u) => this.queue(u.fsPath, 'delete')),
+      folders.onDidCreate((u) => this.queue(u.fsPath, 'create')),
+      folders.onDidDelete((u) => this.queue(u.fsPath, 'delete')),
       vscode.window.onDidChangeActiveTextEditor((e) => void this.autoReveal(e)),
       vscode.commands.registerCommand('csharpWorkbench.refresh', () => { this.core.reset(); this.emitter.fire(undefined); }),
       vscode.commands.registerCommand('csharpWorkbench.toggleShowAllFiles', toggle(true)),
@@ -92,11 +92,11 @@ export class SolutionTreeProvider implements vscode.TreeDataProvider<TreeNode>, 
     this.emitter.fire(undefined);
   }
 
-  private queue(fsPath: string, structural: boolean): void {
+  private queue(fsPath: string, event: FsEvent): void {
+    if (!shouldInvalidate(fsPath, event, this.core.showAllFiles)) return;
     const ext = path.extname(fsPath).toLowerCase();
-    const isSol = ext === '.sln' || ext === '.slnx';
-    if (!isSol && !this.core.projectForPath(fsPath) && !(structural && ext === '.csproj')) return;
-    if (!isSol && !this.core.showAllFiles && isBuildDir(fsPath)) return;
+    const structural = event !== 'change';
+    if (ext !== '.sln' && ext !== '.slnx' && !this.core.projectForPath(fsPath) && !(structural && ext === '.csproj')) return;
     this.pending.set(fsPath, (this.pending.get(fsPath) ?? false) || structural);
     clearTimeout(this.timer);
     this.timer = setTimeout(() => this.flush(), DEBOUNCE_MS);

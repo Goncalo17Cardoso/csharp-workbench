@@ -93,4 +93,48 @@ describe('SolutionTreeCore', () => {
     expect(ps.find((x) => x.label === 'P1')?.contextValue).toBe('cw.project.startup');
     expect(ps.find((x) => x.label === 'P0')?.contextValue).toBe('cw.project');
   });
+
+  it('concurrent roots() share one build and identical nodes', async () => {
+    const { core, deps } = make();
+    const [a, b] = await Promise.all([core.roots(), core.roots()]);
+    expect(a).toBe(b);
+    expect(deps.loadSolution).toHaveBeenCalledTimes(1);
+    expect(deps.discover).toHaveBeenCalledTimes(1);
+    await core.targets();
+    expect(deps.discover).toHaveBeenCalledTimes(1);
+  });
+
+  it('concurrent children() for one project share one load', async () => {
+    const { core, deps } = make();
+    const [sol] = await core.roots();
+    const p0 = (await core.children(sol)).find((x) => x.kind === 'project')!;
+    const [a, b] = await Promise.all([core.children(p0), core.children(p0)]);
+    expect(a).toBe(b);
+    expect(deps.loadProjectItems).toHaveBeenCalledTimes(1);
+  });
+
+  it('an invalidation during a load does not cache stale data', async () => {
+    const { core, deps } = make();
+    const [sol] = await core.roots();
+    const p0 = (await core.children(sol)).find((x) => x.kind === 'project')!;
+    const first = core.children(p0);
+    core.invalidate('/w/P0/Program.cs');
+    const second = await core.children(p0);
+    await first;
+    expect(await core.children(p0)).toBe(second);
+    expect(deps.loadProjectItems).toHaveBeenCalledTimes(2);
+  });
+
+  it('getParent resolves a node under Dependencies', async () => {
+    const { core, deps } = make();
+    deps.loadPackages.mockResolvedValue([{ id: 'Serilog', requested: '1.0.0' }] as never);
+    const [sol] = await core.roots();
+    const p0 = (await core.children(sol)).find((x) => x.kind === 'project')!;
+    const dep = (await core.children(p0)).find((x) => x.kind === 'dependencies')!;
+    const pkgs = dep.children!.find((x) => x.kind === 'packages')!;
+    const pkg = pkgs.children![0];
+    expect(core.getParent(pkg)).toBe(pkgs);
+    expect(core.getParent(pkgs)).toBe(dep);
+    expect(core.getParent(dep)).toBe(p0);
+  });
 });

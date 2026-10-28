@@ -29,7 +29,8 @@ export class SolutionTreeCore {
   private showAll = false;
   private model: SolutionModel | undefined;
   private projects: SolutionProject[] = [];
-  private rootNodes: TreeNode[] | undefined;
+  private rootsPromise: Promise<TreeNode[]> | undefined;
+  private targetsPromise: Promise<Target[]> | undefined;
   private readonly cache = new Map<string, Promise<TreeNode[]>>();
   private readonly projectNodes = new Map<string, TreeNode>();
   private readonly parents = new Map<TreeNode, TreeNode>();
@@ -39,23 +40,34 @@ export class SolutionTreeCore {
   get showAllFiles(): boolean { return this.showAll; }
   get solutionPath(): string | undefined { return this.model?.path; }
 
-  async targets(): Promise<Target[]> { return selectTargets(await this.deps.discover()); }
+  targets(): Promise<Target[]> {
+    this.targetsPromise ??= this.deps.discover().then(selectTargets);
+    this.targetsPromise.catch(() => { this.targetsPromise = undefined; });
+    return this.targetsPromise;
+  }
 
-  async roots(): Promise<TreeNode[]> {
-    if (this.rootNodes) return this.rootNodes;
-    this.parents.clear();
-    this.projectNodes.clear();
-    this.model = undefined;
-    this.projects = [];
+  roots(): Promise<TreeNode[]> {
+    if (!this.rootsPromise) {
+      const mine: Promise<TreeNode[]> = this.buildRoots(() => this.rootsPromise === mine);
+      this.rootsPromise = mine;
+      mine.catch(() => { if (this.rootsPromise === mine) this.rootsPromise = undefined; });
+    }
+    return this.rootsPromise;
+  }
+
+  private async buildRoots(isCurrent: () => boolean): Promise<TreeNode[]> {
+    await Promise.resolve(); // let roots() publish this promise before isCurrent() is consulted
     const targets = await this.targets();
     const sols = targets.filter((t) => t.kind !== 'csproj');
     let nodes: TreeNode[] = [];
+    let model: SolutionModel | undefined;
+    let projects: SolutionProject[] = [];
     if (sols.length > 0) {
       const chosen = sols.find((s) => s.path === this.deps.state.selectedSolution()) ?? sols[0];
       try {
-        this.model = await this.deps.loadSolution(chosen.path);
-        this.projects = this.model.projects;
-        nodes = buildSolutionNodes(this.model, { startupProject: this.deps.state.startupProject(chosen.path) });
+        model = await this.deps.loadSolution(chosen.path);
+        projects = model.projects;
+        nodes = buildSolutionNodes(model, { startupProject: this.deps.state.startupProject(chosen.path) });
       } catch (e) {
         nodes = [{
           id: `warning:${chosen.path}`, kind: 'warning', contextValue: 'cw.warning', path: chosen.path,
@@ -63,14 +75,18 @@ export class SolutionTreeCore {
         }];
       }
     } else {
-      this.projects = targets.map((t) => ({ path: t.path, name: t.name }));
-      nodes = this.projects.map((p) => ({
+      projects = targets.map((t) => ({ path: t.path, name: t.name }));
+      nodes = projects.map((p) => ({
         id: `project:${p.path}`, kind: 'project' as const, label: p.name, path: p.path,
         projectPath: p.path, contextValue: 'cw.project',
       }));
     }
+    if (!isCurrent()) return nodes; // superseded by a reset: do not touch shared state
+    this.parents.clear();
+    this.projectNodes.clear();
+    this.model = model;
+    this.projects = projects;
     for (const n of nodes) this.register(n);
-    this.rootNodes = nodes;
     return nodes;
   }
 
@@ -85,7 +101,8 @@ export class SolutionTreeCore {
       if (!p) {
         p = this.loadProject(node);
         this.cache.set(node.projectPath, p);
-        p.catch(() => this.cache.delete(node.projectPath!));
+        const key = node.projectPath;
+        p.catch(() => { if (this.cache.get(key) === p) this.cache.delete(key); });
       }
       return p;
     }
@@ -124,7 +141,8 @@ export class SolutionTreeCore {
 
   /** Forces a full reload on the next roots(). */
   reset(): void {
-    this.rootNodes = undefined;
+    this.rootsPromise = undefined;
+    this.targetsPromise = undefined;
     this.cache.clear();
   }
 
