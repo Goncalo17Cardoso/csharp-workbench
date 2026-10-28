@@ -22,6 +22,7 @@ describe('buildSolutionNodes', () => {
   it('solution children: folders before projects, sorted', () => {
     const [sol] = buildSolutionNodes(model, {});
     expect(sol.label).toBe("Solution 'My' (3 projects)");
+    expect(sol.count).toBe(3);
     expect(sol.id).toBe('solution:/r/My.sln');
     expect(labels(sol.children!)).toEqual(['Alpha', 'orphan', 'zeta', 'A', 'b']);
     expect(labels(sol.children![0].children!)).toEqual(['c']);
@@ -65,12 +66,35 @@ describe('buildProjectChildren', () => {
       { showAllFiles: false, exists: () => false });
     const folder = out[1];
     expect(folder.label).toBe('Linked');
-    expect(folder.children![0]).toMatchObject({ label: 'S.cs', missing: true, contextValue: 'cw.file.missing', id: 'file:/r/Shared/S.cs' });
+    expect(folder.contextValue).toBe('cw.folder.virtual');
+    expect(folder.children![0]).toMatchObject({ label: 'S.cs', missing: true, contextValue: 'cw.file.linked.missing', id: 'file:/r/Shared/S.cs' });
   });
   it('unlinked item outside the project dir sits at the root under its file name', () => {
     const out = buildProjectChildren(proj, info, ev('/r/Shared/Ext.cs'), [], { showAllFiles: false });
     expect(labels(out.slice(1))).toEqual(['Ext.cs']);
     expect(out[1].missing).toBeUndefined();
+    expect(out[1].contextValue).toBe('cw.file.linked');
+  });
+  it('a Link that escapes the project creates no .. node and sits at the root by file name', () => {
+    const out = buildProjectChildren(proj, info, ev({ fullPath: '/r/Shared/X.cs', link: '..\\Shared\\X.cs' }), [],
+      { showAllFiles: false, exists: () => true });
+    const all = (ns: TreeNode[]): TreeNode[] => ns.flatMap((n) => [n, ...all(n.children ?? [])]);
+    expect(all(out).filter((n) => n.label === '..' || n.label === '.')).toEqual([]);
+    expect(out.slice(1)).toEqual([expect.objectContaining({ label: 'X.cs', kind: 'file', contextValue: 'cw.file.linked', path: '/r/Shared/X.cs' })]);
+  });
+  it('a Link with . and inner .. segments is normalised', () => {
+    const out = buildProjectChildren(proj, info, ev({ fullPath: '/r/Shared/X.cs', link: '.\\A\\..\\B\\.\\X.cs' }), [],
+      { showAllFiles: false, exists: () => true });
+    expect(labels(out.slice(1))).toEqual(['B']);
+    expect(out[1]).toMatchObject({ contextValue: 'cw.folder.virtual', path: '/r/App/B' });
+    expect(labels(out[1].children!)).toEqual(['X.cs']);
+  });
+  it('a folder holding real files stays a plain folder even when it also holds links', () => {
+    const out = buildProjectChildren(proj, info, ev('/r/App/Shared/Own.cs', { fullPath: '/r/Shared/S.cs', link: 'Shared/S.cs' }), [],
+      { showAllFiles: false, exists: () => true });
+    expect(out[1]).toMatchObject({ label: 'Shared', contextValue: 'cw.folder' });
+    const by = Object.fromEntries(out[1].children!.map((c) => [c.label, c.contextValue]));
+    expect(by).toEqual({ 'Own.cs': 'cw.file', 'S.cs': 'cw.file.linked' });
   });
   it('showAllFiles adds excluded files', () => {
     const args = [proj, info, ev('/r/App/A.cs'), [] as PackageRef[]] as const;

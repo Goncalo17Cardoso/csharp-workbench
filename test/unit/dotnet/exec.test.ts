@@ -12,3 +12,11 @@ describe('nodeExec', () => {
     expect(r.code).toBe(3);
   });
 });
+
+describe('nodeExec timeout', () => {
+  it('kills a hung process and resolves with a non-zero code', async () => {
+    const r = await nodeExec(process.execPath, ['-e', 'setTimeout(() => {}, 10000)'], { cwd: process.cwd(), timeoutMs: 200 });
+    expect(r.code).not.toBe(0);
+    expect(r.stderr).toMatch(/^Timed out after 200 ms\. /);
+  });
+});

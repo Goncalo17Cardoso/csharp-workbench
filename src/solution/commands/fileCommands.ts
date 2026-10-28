@@ -11,7 +11,7 @@ import { readProjectInfo } from '../projectInfo';
 import { TemplateCatalog } from '../templateCatalog';
 import type { SolutionTreeProvider } from '../SolutionTreeProvider';
 import {
-  canPasteInto, copyName, dedupeNested, FileExistsError, isSamePathIgnoreCase, type NameError, createBuiltIn, createFromCatalog, ensureNotExists, newItemChoices, validateName,
+  canPasteInto, copyName, dedupeNested, FileExistsError, isSamePathIgnoreCase, type NameError, createBuiltIn, createFromCatalog, ensureNotExists, isInsideProject, newItemChoices, validateName,
 } from './files';
 
 interface Deps {
@@ -176,8 +176,17 @@ export function registerFileCommands(deps: Deps): vscode.Disposable[] {
     } catch (e) { fail(e); } finally { touch(folder); }
   }
 
+  /** Rename and Delete only ever touch real files inside the owning project. */
+  async function guard(n: TreeNode): Promise<boolean> {
+    const owner = n.projectPath ?? (n.path ? projectOf(n.path)?.path : undefined);
+    const ok = (n.kind === 'file' || n.kind === 'folder') && !/\.(linked|virtual)(\.|$)/.test(n.contextValue)
+      && !!owner && !!n.path && await isInsideProject(n.path, owner);
+    if (!ok) fail(new Error(vscode.l10n.t('{0} is not inside the project and cannot be renamed or deleted here.', n.label)));
+    return ok;
+  }
+
   async function rename(node?: TreeNode): Promise<void> {
-    if (!node?.path) return;
+    if (!node?.path || !(await guard(node))) return;
     const old = path.basename(node.path);
     const dir = path.dirname(node.path);
     const name = await vscode.window.showInputBox({
@@ -200,6 +209,7 @@ export function registerFileCommands(deps: Deps): vscode.Disposable[] {
     const keep = new Set(dedupeNested(selection(node, nodes).filter((n) => n.path).map((n) => n.path!)));
     const sel = selection(node, nodes).filter((n) => n.path && keep.delete(n.path));
     if (sel.length === 0) return;
+    for (const n of sel) if (!(await guard(n))) return;
     const msg = sel.length === 1
       ? vscode.l10n.t('Delete {0}?', sel[0].label) : vscode.l10n.t('Delete {0} items?', sel.length);
     if (!(await confirmAction(msg, vscode.l10n.t('Items are moved to the Trash.'), vscode.l10n.t('Delete')))) return;

@@ -459,12 +459,12 @@
         },
         {
           "command": "csharpWorkbench.rename",
-          "when": "viewItem =~ /^cw\\.(file|folder)/",
+          "when": "viewItem =~ /^cw\\.(file|folder)(\\.excluded)?$/",
           "group": "6_edit@1"
         },
         {
           "command": "csharpWorkbench.delete",
-          "when": "viewItem =~ /^cw\\.(file|folder)/",
+          "when": "viewItem =~ /^cw\\.(file|folder)(\\.excluded)?$/",
           "group": "6_edit@2"
         },
         {
@@ -514,7 +514,7 @@
         },
         {
           "command": "csharpWorkbench.addProjectReference",
-          "when": "viewItem =~ /^cw\\.projectRefs$/",
+          "when": "csharpWorkbench.hasSolution && viewItem =~ /^cw\\.projectRefs$/",
           "group": "4_manage@1"
         },
         {
@@ -534,12 +534,12 @@
         },
         {
           "command": "csharpWorkbench.renameProject",
-          "when": "viewItem =~ /^cw\\.project(\\.|$)/",
+          "when": "csharpWorkbench.hasSolution && viewItem =~ /^cw\\.project(\\.|$)/",
           "group": "6_edit@0"
         },
         {
           "command": "csharpWorkbench.removeFromSolution",
-          "when": "viewItem =~ /^cw\\.project(\\.|$)/",
+          "when": "csharpWorkbench.hasSolution && viewItem =~ /^cw\\.project(\\.|$)/",
           "group": "7_remove@1"
         },
         {
@@ -579,7 +579,7 @@
         },
         {
           "command": "csharpWorkbench.setStartupProject",
-          "when": "viewItem =~ /^cw\\.project$/",
+          "when": "csharpWorkbench.hasSolution && viewItem =~ /^cw\\.project$/",
           "group": "3_run@2"
         },
         {
@@ -646,7 +646,7 @@
         },
         {
           "command": "csharpWorkbench.addProjectReference",
-          "when": "viewItem =~ /^cw\\.project(\\.|$)/",
+          "when": "csharpWorkbench.hasSolution && viewItem =~ /^cw\\.project(\\.|$)/",
           "group": "2_refs@1"
         },
         {
@@ -676,7 +676,7 @@
       "activitybar": [
         {
           "id": "csharpWorkbench",
-          "title": "Solution Explorer",
+          "title": "%viewsContainers.solutionExplorer.title%",
           "icon": "media/solution-explorer.svg"
         }
       ]
@@ -685,7 +685,7 @@
       "csharpWorkbench": [
         {
           "id": "csharpWorkbench.solutionExplorer",
-          "name": "Solution Explorer"
+          "name": "%views.solutionExplorer.name%"
         }
       ]
     },

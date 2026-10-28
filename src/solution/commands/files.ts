@@ -1,4 +1,5 @@
-import { basename, extname, isAbsolute, join, relative, resolve } from 'node:path';
+import { realpath as fsRealpath } from 'node:fs/promises';
+import { basename, dirname, extname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { renderCodeTemplate, type CodeKind } from '../codeTemplates';
 import type { ProjectInfoData } from '../model';
 import { namespaceFor, toIdentifier } from '../naming';
@@ -70,6 +71,20 @@ type ProjectLookup = { projectForPath(p: string): { path: string } | undefined }
 export function isSameProject(core: ProjectLookup, a: string, b: string): boolean {
   const pa = core.projectForPath(a);
   return !!pa && pa.path === core.projectForPath(b)?.path;
+}
+
+/**
+ * Guard for destructive file operations: true only when the real path of `target` lies strictly
+ * below the real directory of `projectPath`. Unresolvable targets are refused.
+ */
+export async function isInsideProject(
+  target: string, projectPath: string, realpath: (p: string) => Promise<string> = (p) => fsRealpath(p),
+): Promise<boolean> {
+  try {
+    const [t, dir] = await Promise.all([realpath(target), realpath(dirname(projectPath))]);
+    const r = relative(dir, t);
+    return r !== '' && r !== '..' && !r.startsWith(`..${sep}`) && !isAbsolute(r);
+  } catch { return false; }
 }
 
 export function isDescendantOrSelf(dir: string, p: string): boolean {

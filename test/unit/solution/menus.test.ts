@@ -100,3 +100,23 @@ describe('task 11 final menus', () => {
     }
   });
 });
+
+describe('linked items and virtual folders', () => {
+  const ctx = menus['view/item/context'];
+  const when = (c: string) => regexOf(ctx.find((m) => m.command === `csharpWorkbench.${c}`)!.when!);
+  it('delete and rename never match linked files or virtual folders', () => {
+    for (const c of ['delete', 'rename']) {
+      for (const v of ['cw.file.linked', 'cw.file.linked.missing', 'cw.folder.virtual']) expect(when(c).test(v), `${c} ${v}`).toBe(false);
+      for (const v of ['cw.file', 'cw.file.excluded', 'cw.folder']) expect(when(c).test(v), `${c} ${v}`).toBe(true);
+    }
+  });
+});
+
+describe('solution-only menus', () => {
+  const SOLUTION_ONLY = ['renameProject', 'removeFromSolution', 'setStartupProject', 'addProjectReference', 'runStartup', 'debugStartup'];
+  const entries = Object.values(menus).flat().filter((m) => SOLUTION_ONLY.includes((m.command ?? '').replace('csharpWorkbench.', '')));
+  it('found every entry', () => expect(new Set(entries.map((m) => m.command)).size).toBe(SOLUTION_ONLY.length));
+  it('require an open solution', () => {
+    for (const m of entries.filter((x) => x.when !== 'false')) expect(m.when, m.command).toMatch(/(^|&& )csharpWorkbench\.hasSolution( &&|$)/);
+  });
+});

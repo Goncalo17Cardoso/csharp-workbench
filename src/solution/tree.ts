@@ -1,4 +1,4 @@
-import { basename, dirname, isAbsolute, join, relative } from 'node:path';
+import { basename, dirname, isAbsolute, join, posix, relative } from 'node:path';
 import type { PackageRef } from '../core/types';
 import type { ProjectInfoData, ProjectItems, SolutionModel, SolutionProject, TreeNode } from './model';
 import { nestFiles } from './nesting';
@@ -31,7 +31,7 @@ export function buildSolutionNodes(model: SolutionModel, opts: { startupProject?
   const n = model.projects.length;
   const solName = basename(model.path).replace(/\.(sln|slnx)$/i, '');
   return [node({
-    id: `solution:${model.path}`, kind: 'solution', path: model.path,
+    id: `solution:${model.path}`, kind: 'solution', path: model.path, count: n,
     label: `Solution '${solName}' (${n} project${n === 1 ? '' : 's'})`,
     children: folderNode(undefined, new Set()),
   })];
@@ -42,8 +42,16 @@ function projectNode(p: SolutionProject, startup?: string): TreeNode {
     p.path === startup ? '.startup' : '');
 }
 
-interface Dir { dirs: Map<string, Dir>; files: Array<{ name: string; full: string; missing?: boolean; excluded?: boolean }> }
-const newDir = (): Dir => ({ dirs: new Map(), files: [] });
+interface Entry { full: string; missing?: boolean; excluded?: boolean; linked?: boolean }
+/** `real`: some non-linked file lives below, so the folder maps to a directory inside the project. */
+interface Dir { dirs: Map<string, Dir>; files: Array<Entry & { name: string }>; real: boolean }
+const newDir = (): Dir => ({ dirs: new Map(), files: [], real: false });
+
+/** Normalises a `Link` (or relative path); a path that escapes the project collapses to its file name. */
+function virtualPath(rel: string, full: string): string {
+  const n = posix.normalize(rel.replace(/\\/g, '/'));
+  return n === '.' || n === '..' || n.startsWith('../') || posix.isAbsolute(n) ? basename(full) : n;
+}
 
 export function buildProjectChildren(
   project: SolutionProject,
@@ -55,13 +63,14 @@ export function buildProjectChildren(
   const pp = project.path;
   const projDir = dirname(pp);
   const root = newDir();
-  const place = (rel: string, entry: { full: string; missing?: boolean; excluded?: boolean }) => {
-    const parts = rel.split(/[\\/]/).filter((s) => s && s !== '.');
+  const place = (rel: string, entry: Entry) => {
+    const parts = virtualPath(rel, entry.full).split('/').filter((s) => s && s !== '.' && s !== '..');
     const name = parts.pop() ?? basename(entry.full);
     let d = root;
     for (const part of parts) {
       let next = d.dirs.get(part);
       if (!next) d.dirs.set(part, (next = newDir()));
+      if (!entry.linked) next.real = true;
       d = next;
     }
     d.files.push({ name, ...entry });
@@ -69,10 +78,13 @@ export function buildProjectChildren(
   const known = new Set<string>();
   for (const it of items.items) {
     known.add(it.fullPath);
-    const rel = it.link ?? relative(projDir, it.fullPath);
-    const outside = !it.link && (rel.startsWith('..') || isAbsolute(rel));
+    const own = relative(projDir, it.fullPath);
+    const outside = own.startsWith('..') || isAbsolute(own);
+    // Linked or outside items point at files other projects may share: never treat them as project files.
+    const linked = !!it.link || outside;
     const missing = it.link && opts.exists ? !opts.exists(it.fullPath) : false;
-    place(outside ? basename(it.fullPath) : rel, { full: it.fullPath, ...(missing ? { missing: true } : {}) });
+    place(it.link ?? (outside ? basename(it.fullPath) : own),
+      { full: it.fullPath, ...(linked ? { linked: true } : {}), ...(missing ? { missing: true } : {}) });
   }
   if (opts.showAllFiles) {
     for (const f of opts.allFiles ?? []) {
@@ -115,7 +127,8 @@ export function buildProjectChildren(
 function dirNodes(d: Dir, absDir: string, pp: string): TreeNode[] {
   const folders = [...d.dirs.entries()].sort((a, b) => cmp(a[0], b[0])).map(([name, sub]) => {
     const p = join(absDir, name);
-    return node({ id: `folder:${p}`, kind: 'folder', label: name, path: p, projectPath: pp, children: dirNodes(sub, p, pp) });
+    return node({ id: `folder:${p}`, kind: 'folder', label: name, path: p, projectPath: pp, children: dirNodes(sub, p, pp) },
+      sub.real ? '' : '.virtual');
   });
   const nest = nestFiles(d.files.map((f) => f.name));
   const lower = (s: string) => s.toLowerCase();
@@ -129,7 +142,7 @@ function dirNodes(d: Dir, absDir: string, pp: string): TreeNode[] {
     id: `file:${f.full}`, kind: 'file', label: f.name, path: f.full, projectPath: pp,
     ...(f.excluded ? { description: 'excluded' } : {}),
     ...(f.missing ? { missing: true } : {}),
-  }, f.excluded ? '.excluded' : f.missing ? '.missing' : '');
+  }, f.excluded ? '.excluded' : f.linked ? (f.missing ? '.linked.missing' : '.linked') : '');
   const children = new Map<string, TreeNode[]>();
   const tops: Dir['files'] = [];
   for (const f of d.files) {

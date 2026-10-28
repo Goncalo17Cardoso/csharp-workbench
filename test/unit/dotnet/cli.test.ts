@@ -93,6 +93,13 @@ describe('DotnetCli solution explorer wrappers', () => {
     expect((await call((c) => c.getItems('/s/P.csproj', ['Compile', 'None']))).args)
       .toEqual(['msbuild', '/s/P.csproj', '-getItem:Compile', '-getItem:None']);
   });
+  it('msbuild evaluations run with a 60 s timeout, other commands without', async () => {
+    const m = mk({ code: 0, stdout: 'x', stderr: '' });
+    await m.cli.getItems('/s/P.csproj', ['Compile']);
+    await m.cli.getProperty('/s/P.csproj', 'TargetPath');
+    await m.cli.restore('/s/P.csproj');
+    expect(m.exec.mock.calls.map((c) => (c[2] as { timeoutMs?: number }).timeoutMs)).toEqual([60_000, 60_000, undefined]);
+  });
   it('getProperty trims, with props', async () => {
     const r = await call((c) => c.getProperty('/s/P.csproj', 'RootNamespace', { Configuration: 'Debug' }), { code: 0, stdout: ' Ns\n', stderr: '' });
     expect(r.args).toEqual(['msbuild', '/s/P.csproj', '-getProperty:RootNamespace', '-p:Configuration=Debug']);

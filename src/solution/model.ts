@@ -12,4 +12,6 @@ export type NodeKind = 'solution' | 'solutionFolder' | 'project' | 'dependencies
 export interface TreeNode {
   id: string; kind: NodeKind; label: string; description?: string;
   path?: string; projectPath?: string; contextValue: string; children?: TreeNode[]; missing?: boolean;
+  /** Solution node only: the number of projects, for the translated label. */
+  count?: number;
 }

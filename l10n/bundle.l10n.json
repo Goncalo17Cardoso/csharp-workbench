@@ -82,5 +82,14 @@
   "Run": "Run",
   "The .NET debugger is not available in this editor. Use Run instead.": "The .NET debugger is not available in this editor. Use Run instead.",
   "Could not manage user secrets: {0}": "Could not manage user secrets: {0}",
-  "Invalid UserSecretsId: {0}": "Invalid UserSecretsId: {0}"
+  "Invalid UserSecretsId: {0}": "Invalid UserSecretsId: {0}",
+  "{0} is not inside the project and cannot be renamed or deleted here.": "{0} is not inside the project and cannot be renamed or deleted here.",
+  "Solution '{0}' ({1} project)": "Solution '{0}' ({1} project)",
+  "Solution '{0}' ({1} projects)": "Solution '{0}' ({1} projects)",
+  "Dependencies": "Dependencies",
+  "Packages": "Packages",
+  "Projects": "Projects",
+  "Frameworks": "Frameworks",
+  "Could not evaluate project — showing files on disk": "Could not evaluate project — showing files on disk",
+  "Could not read solution": "Could not read solution"
 }

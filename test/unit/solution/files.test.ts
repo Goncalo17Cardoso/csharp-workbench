@@ -1,7 +1,10 @@
-import { describe, expect, it, vi } from 'vitest';
+import { mkdir, mkdtemp, realpath, rm, symlink, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { renderCodeTemplate } from '../../../src/solution/codeTemplates';
 import {
-  canPasteInto, dedupeNested, FileExistsError, isSamePathIgnoreCase, copyName, createBuiltIn, createFromCatalog, ensureNotExists, isSameProject, newItemChoices, targetPathFor,
+  canPasteInto, dedupeNested, FileExistsError, isSamePathIgnoreCase, copyName, createBuiltIn, createFromCatalog, ensureNotExists, isInsideProject, isSameProject, newItemChoices, targetPathFor,
   validateDrop, validateName,
 } from '../../../src/solution/commands/files';
 import type { ProjectInfoData } from '../../../src/solution/model';
@@ -125,5 +128,41 @@ describe('createFromCatalog', () => {
     expect(newTemplate).toHaveBeenCalledWith('apicontroller',
       ['-n', 'New', '-o', '/f', '--project', '/s/Core/Core.csproj'], '/f');
     expect(created).toEqual(['/f/New.cs']);
+  });
+});
+
+describe('isInsideProject', () => {
+  let root: string;
+  beforeAll(async () => {
+    root = await realpath(await mkdtemp(join(tmpdir(), 'cw guard #1-')));
+    await mkdir(join(root, 'App', 'Sub'), { recursive: true });
+    await mkdir(join(root, 'Shared'));
+    for (const f of ['App/App.csproj', 'App/Sub/A.cs', 'Shared/X.cs']) await writeFile(join(root, f), '');
+    await symlink(join(root, 'Shared'), join(root, 'App', 'LinkDir'));
+    await symlink(join(root, 'Shared', 'X.cs'), join(root, 'App', 'LinkFile.cs'));
+  });
+  afterAll(() => rm(root, { recursive: true, force: true }));
+  const proj = () => join(root, 'App', 'App.csproj');
+
+  it('accepts files and folders under the project dir', async () => {
+    expect(await isInsideProject(join(root, 'App', 'Sub', 'A.cs'), proj())).toBe(true);
+    expect(await isInsideProject(join(root, 'App', 'Sub'), proj())).toBe(true);
+  });
+  it('refuses paths outside the project, the project dir itself and .. escapes', async () => {
+    expect(await isInsideProject(join(root, 'Shared', 'X.cs'), proj())).toBe(false);
+    expect(await isInsideProject(join(root, 'App'), proj())).toBe(false);
+    expect(await isInsideProject(join(root, 'App', '..'), proj())).toBe(false);
+    expect(await isInsideProject(join(root, 'App', 'Sub', '..', '..', 'Shared', 'X.cs'), proj())).toBe(false);
+    expect(await isInsideProject(`${join(root, 'App')}/../Shared`, proj())).toBe(false);
+  });
+  it('refuses paths that reach outside through a symlinked directory', async () => {
+    expect(await isInsideProject(join(root, 'App', 'LinkDir', 'X.cs'), proj())).toBe(false);
+  });
+  it('refuses symlinks whose real target is outside the project', async () => {
+    expect(await isInsideProject(join(root, 'App', 'LinkFile.cs'), proj())).toBe(false);
+    expect(await isInsideProject(join(root, 'App', 'LinkDir'), proj())).toBe(false);
+  });
+  it('refuses when the target cannot be resolved', async () => {
+    expect(await isInsideProject(join(root, 'App', 'Nope', 'B.cs'), proj())).toBe(false);
   });
 });

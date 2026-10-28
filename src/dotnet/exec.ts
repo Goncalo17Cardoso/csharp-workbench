@@ -16,9 +16,10 @@ export const nodeExec: Exec = (file, args, opts) =>
       { cwd: opts.cwd, timeout: opts.timeoutMs, maxBuffer: 64 * 1024 * 1024, windowsHide: true },
       (err, stdout, stderr) => {
         if (!err) return resolve({ code: 0, stdout, stderr });
-        const e = err as NodeJS.ErrnoException & { code?: number | string };
+        const e = err as NodeJS.ErrnoException & { code?: number | string; killed?: boolean };
         const code = typeof e.code === 'number' ? e.code : 1;
-        resolve({ code, stdout: stdout ?? '', stderr: stderr || e.message });
+        const timedOut = e.killed && opts.timeoutMs !== undefined ? `Timed out after ${opts.timeoutMs} ms. ` : '';
+        resolve({ code, stdout: stdout ?? '', stderr: timedOut + (stderr || e.message) });
       },
     );
   });

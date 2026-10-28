@@ -57,3 +57,12 @@ describe('loadProjectItems', () => {
     expect(r.error).toMatch(/^boom; /);
   });
 });
+
+describe('loadProjectItems timeout', () => {
+  it('falls back to the disk walk when evaluation times out', async () => {
+    const cli = { getItems: async () => { throw new DotnetError('dotnet msbuild failed (exit 1): timed out', [], 1, '', 'timed out'); } };
+    const r = await loadProjectItems(join(dir, 'a.csproj'), cli, fs);
+    expect(r.evaluated).toBe(false);
+    expect(r.items.map((i) => i.fullPath.slice(dir.length + 1)).sort()).toEqual(['a.csproj', 'src/B.cs']);
+  });
+});

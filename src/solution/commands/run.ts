@@ -159,7 +159,8 @@ export function registerRunCommands(deps: Deps): vscode.Disposable[] {
     reg('debug', (n?: TreeNode) => debugProject(projectOf(n))),
     reg('setStartupProject', async (n?: TreeNode) => {
       const p = projectOf(n); const sln = solutionPath();
-      if (!p || !sln) return;
+      if (!sln) { void vscode.window.showInformationMessage(vscode.l10n.t('No solution is open.')); return; }
+      if (!p) return;
       await setStartupProject(ws, sln, p);
       void vscode.commands.executeCommand('csharpWorkbench.refresh');
     }),

@@ -21,6 +21,25 @@ const ICONS: Partial<Record<TreeNode['kind'], string>> = {
 };
 const readFile = (p: string) => fsp.readFile(p, 'utf8');
 
+/** The core builds English labels; the fixed ones are translated here, keyed by node kind. */
+function labelOf(node: TreeNode): string {
+  switch (node.kind) {
+    case 'solution': {
+      const name = path.basename(node.path ?? '').replace(/\.(sln|slnx)$/i, '');
+      const n = node.count ?? 0;
+      return n === 1 ? vscode.l10n.t('Solution \'{0}\' ({1} project)', name, n) : vscode.l10n.t('Solution \'{0}\' ({1} projects)', name, n);
+    }
+    case 'dependencies': return vscode.l10n.t('Dependencies');
+    case 'packages': return vscode.l10n.t('Packages');
+    case 'projectRefs': return vscode.l10n.t('Projects');
+    case 'frameworks': return vscode.l10n.t('Frameworks');
+    case 'warning':
+      return node.projectPath
+        ? vscode.l10n.t('Could not evaluate project — showing files on disk') : vscode.l10n.t('Could not read solution');
+    default: return node.label;
+  }
+}
+
 export class SolutionTreeProvider implements vscode.TreeDataProvider<TreeNode>, vscode.Disposable {
   private readonly emitter = new vscode.EventEmitter<TreeNode | undefined>();
   readonly onDidChangeTreeData = this.emitter.event;
@@ -109,7 +128,7 @@ export class SolutionTreeProvider implements vscode.TreeDataProvider<TreeNode>, 
       dragMimeTypes: [mime],
       dropMimeTypes: [mime],
       handleDrag: (nodes, data) => {
-        const movable = nodes.filter((n) => (n.kind === 'file' || n.kind === 'folder') && n.path);
+        const movable = nodes.filter((n) => (n.kind === 'file' || n.kind === 'folder') && n.path && !/\.(linked|virtual)(\.|$)/.test(n.contextValue));
         if (movable.length > 0) data.set(mime, new vscode.DataTransferItem(movable.map((n) => n.path!)));
       },
       handleDrop: async (target, data) => {
@@ -172,7 +191,8 @@ export class SolutionTreeProvider implements vscode.TreeDataProvider<TreeNode>, 
     if (element) return this.core.children(element);
     const roots = await this.core.roots();
     const sols = (await this.core.targets()).filter((t) => t.kind !== 'csproj');
-    void vscode.commands.executeCommand('setContext', 'csharpWorkbench.hasSolution', roots.length > 0);
+    // Only a loaded .sln/.slnx counts: loose .csproj files hide the solution-only menus (spec §7a).
+    void vscode.commands.executeCommand('setContext', 'csharpWorkbench.hasSolution', !!this.core.solutionPath);
     void vscode.commands.executeCommand('setContext', 'csharpWorkbench.multipleSolutions', sols.length > 1);
     return roots;
   }
@@ -183,7 +203,7 @@ export class SolutionTreeProvider implements vscode.TreeDataProvider<TreeNode>, 
     const hasKids = node.kind === 'project' || !!node.children?.length;
     const state = node.kind === 'solution' ? vscode.TreeItemCollapsibleState.Expanded
       : hasKids ? vscode.TreeItemCollapsibleState.Collapsed : vscode.TreeItemCollapsibleState.None;
-    const item = new vscode.TreeItem(node.label, state);
+    const item = new vscode.TreeItem(labelOf(node), state);
     item.id = node.id;
     item.contextValue = node.contextValue;
     if (node.kind === 'file' || node.kind === 'folder') {

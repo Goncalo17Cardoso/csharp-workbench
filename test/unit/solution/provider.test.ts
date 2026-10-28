@@ -40,6 +40,15 @@ describe('SolutionTreeCore', () => {
     expect(r.map((x) => x.kind)).toEqual(['project', 'project']);
   });
 
+  it('solutionPath (the hasSolution context key) is set only when a solution is loaded', async () => {
+    const loose = make({ sln: false });
+    await loose.core.roots();
+    expect(loose.core.solutionPath).toBeUndefined();
+    const withSln = make();
+    await withSln.core.roots();
+    expect(withSln.core.solutionPath).toBe(SLN);
+  });
+
   it('project children load lazily once', async () => {
     const { core, deps } = make({ n: 20 });
     const [sol] = await core.roots();

@@ -4,11 +4,14 @@ import type { Output } from '../output';
 import { DotnetError, type Exec } from './exec';
 import { parseListPackageJson, parseSdkVersion, parseSlnList } from './parse';
 
+/** A hung `dotnet msbuild` evaluation (offline SDK resolver, locked file) is killed after this. */
+export const MSBUILD_EVAL_TIMEOUT_MS = 60_000;
+
 export class DotnetCli {
   constructor(private exec: Exec, private dotnetPath: string, private out: Output) {}
 
-  private async run(args: string[], cwd: string): Promise<string> {
-    const r = await this.exec(this.dotnetPath, args, { cwd });
+  private async run(args: string[], cwd: string, timeoutMs?: number): Promise<string> {
+    const r = await this.exec(this.dotnetPath, args, timeoutMs === undefined ? { cwd } : { cwd, timeoutMs });
     this.out.log(args, r);
     if (r.code !== 0) {
       throw new DotnetError(
@@ -90,11 +93,11 @@ export class DotnetCli {
   }
 
   async getItems(project: string, types: string[]): Promise<string> {
-    return this.run(['msbuild', project, ...types.map((t) => `-getItem:${t}`)], dirname(project));
+    return this.run(['msbuild', project, ...types.map((t) => `-getItem:${t}`)], dirname(project), MSBUILD_EVAL_TIMEOUT_MS);
   }
 
   async getProperty(project: string, name: string, props: Record<string, string> = {}): Promise<string> {
     const p = Object.entries(props).map(([k, v]) => `-p:${k}=${v}`);
-    return (await this.run(['msbuild', project, `-getProperty:${name}`, ...p], dirname(project))).trim();
+    return (await this.run(['msbuild', project, `-getProperty:${name}`, ...p], dirname(project), MSBUILD_EVAL_TIMEOUT_MS)).trim();
   }
 }
