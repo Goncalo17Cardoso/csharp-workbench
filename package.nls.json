@@ -6,5 +6,18 @@
   "command.showAllFiles.title": "Show All Files",
   "command.hideAllFiles.title": "Hide Excluded Files",
   "viewsWelcome.noSolution": "No solution or project found.\n[Manage NuGet Packages](command:csharpWorkbench.manageNuget)",
-  "config.autoReveal.description": "Reveal the active editor's file in the Solution Explorer."
+  "config.autoReveal.description": "Reveal the active editor's file in the Solution Explorer.",
+  "command.newItem.title": "New Item…",
+  "command.newClass.title": "Class…",
+  "command.newInterface.title": "Interface…",
+  "command.newFolder.title": "New Folder",
+  "command.addExistingItem.title": "Existing Item…",
+  "command.rename.title": "Rename",
+  "command.delete.title": "Delete",
+  "command.copy.title": "Copy",
+  "command.paste.title": "Paste",
+  "command.copyPath.title": "Copy Path",
+  "command.revealInFinder.title": "Reveal in Finder",
+  "command.openInTerminal.title": "Open in Terminal",
+  "submenu.add.label": "Add"
 }

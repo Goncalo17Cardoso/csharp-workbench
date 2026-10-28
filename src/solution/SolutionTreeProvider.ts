@@ -6,6 +6,7 @@ import { readPackageRefs } from '../workspace/projectFiles';
 import type { TreeNode } from './model';
 import { readProjectInfo } from './projectInfo';
 import { loadProjectItems, walkProjectDir } from './projectItems';
+import { validateDrop } from './commands/files';
 import { loadSolution } from './slnParse';
 import { getSelectedSolution, getStartupProject, setSelectedSolution } from './state';
 import { SolutionTreeCore } from './treeCore';
@@ -50,9 +51,19 @@ export class SolutionTreeProvider implements vscode.TreeDataProvider<TreeNode>, 
     });
   }
 
+  get treeCore(): SolutionTreeCore { return this.core; }
+
+  /** Drops the cached project items around a changed path now, without waiting for the watcher. */
+  invalidatePath(p: string): void {
+    const hit = this.core.invalidate(p, true);
+    if (hit === null) this.emitter.fire(undefined);
+    else if (hit) this.emitter.fire(hit);
+    else if (this.core.projectForPath(p)) this.emitter.fire(undefined);
+  }
+
   register(): vscode.Disposable[] {
     this.view = vscode.window.createTreeView('csharpWorkbench.solutionExplorer', {
-      treeDataProvider: this, showCollapseAll: true, canSelectMany: true,
+      treeDataProvider: this, showCollapseAll: true, canSelectMany: true, dragAndDropController: this.dnd(),
     });
     void vscode.commands.executeCommand('setContext', 'csharpWorkbench.showAllFiles', false);
     const toggle = (on: boolean) => () => {
@@ -90,6 +101,38 @@ export class SolutionTreeProvider implements vscode.TreeDataProvider<TreeNode>, 
     await setSelectedSolution(this.ws, pick.path);
     this.core.reset();
     this.emitter.fire(undefined);
+  }
+
+  private dnd(): vscode.TreeDragAndDropController<TreeNode> {
+    const mime = 'application/vnd.code.tree.csharpworkbench.solutionexplorer';
+    return {
+      dragMimeTypes: [mime],
+      dropMimeTypes: [mime],
+      handleDrag: (nodes, data) => {
+        const movable = nodes.filter((n) => (n.kind === 'file' || n.kind === 'folder') && n.path);
+        if (movable.length > 0) data.set(mime, new vscode.DataTransferItem(movable.map((n) => n.path!)));
+      },
+      handleDrop: async (target, data) => {
+        const sources = data.get(mime)?.value as string[] | undefined;
+        if (!sources?.length || !target || !target.path || (target.kind !== 'folder' && target.kind !== 'project')) return;
+        const dir = target.kind === 'project' ? path.dirname(target.path) : target.path;
+        const err = validateDrop(this.core, sources, dir);
+        if (err) {
+          void vscode.window.showErrorMessage(err === 'Files can only be moved within the same project.'
+            ? vscode.l10n.t('Files can only be moved within the same project.') : vscode.l10n.t('A folder cannot be moved into itself.'));
+          return;
+        }
+        try {
+          for (const s of sources) {
+            if (path.dirname(s) === dir) continue;
+            const dest = path.join(dir, path.basename(s));
+            if (await fsp.access(dest).then(() => true, () => false)) throw new Error(vscode.l10n.t('File already exists: {0}', path.basename(s)));
+            await vscode.workspace.fs.rename(vscode.Uri.file(s), vscode.Uri.file(dest));
+          }
+          this.invalidatePath(dir);
+        } catch (e) { void vscode.window.showErrorMessage(e instanceof Error ? e.message : String(e)); }
+      },
+    };
   }
 
   private queue(fsPath: string, event: FsEvent): void {

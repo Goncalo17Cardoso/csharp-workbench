@@ -68,6 +68,66 @@
         "title": "%command.hideAllFiles.title%",
         "category": "C# Workbench",
         "icon": "$(eye)"
+      },
+      {
+        "command": "csharpWorkbench.newItem",
+        "title": "%command.newItem.title%",
+        "category": "C# Workbench"
+      },
+      {
+        "command": "csharpWorkbench.newClass",
+        "title": "%command.newClass.title%",
+        "category": "C# Workbench"
+      },
+      {
+        "command": "csharpWorkbench.newInterface",
+        "title": "%command.newInterface.title%",
+        "category": "C# Workbench"
+      },
+      {
+        "command": "csharpWorkbench.newFolder",
+        "title": "%command.newFolder.title%",
+        "category": "C# Workbench"
+      },
+      {
+        "command": "csharpWorkbench.addExistingItem",
+        "title": "%command.addExistingItem.title%",
+        "category": "C# Workbench"
+      },
+      {
+        "command": "csharpWorkbench.rename",
+        "title": "%command.rename.title%",
+        "category": "C# Workbench"
+      },
+      {
+        "command": "csharpWorkbench.delete",
+        "title": "%command.delete.title%",
+        "category": "C# Workbench"
+      },
+      {
+        "command": "csharpWorkbench.copy",
+        "title": "%command.copy.title%",
+        "category": "C# Workbench"
+      },
+      {
+        "command": "csharpWorkbench.paste",
+        "title": "%command.paste.title%",
+        "category": "C# Workbench"
+      },
+      {
+        "command": "csharpWorkbench.copyPath",
+        "title": "%command.copyPath.title%",
+        "category": "C# Workbench"
+      },
+      {
+        "command": "csharpWorkbench.revealInFinder",
+        "title": "%command.revealInFinder.title%",
+        "category": "C# Workbench"
+      },
+      {
+        "command": "csharpWorkbench.openInTerminal",
+        "title": "%command.openInTerminal.title%",
+        "category": "C# Workbench"
       }
     ],
     "menus": {
@@ -81,6 +141,54 @@
       "commandPalette": [
         {
           "command": "csharpWorkbench.manageNuget"
+        },
+        {
+          "command": "csharpWorkbench.newItem",
+          "when": "false"
+        },
+        {
+          "command": "csharpWorkbench.newClass",
+          "when": "false"
+        },
+        {
+          "command": "csharpWorkbench.newInterface",
+          "when": "false"
+        },
+        {
+          "command": "csharpWorkbench.newFolder",
+          "when": "false"
+        },
+        {
+          "command": "csharpWorkbench.addExistingItem",
+          "when": "false"
+        },
+        {
+          "command": "csharpWorkbench.rename",
+          "when": "false"
+        },
+        {
+          "command": "csharpWorkbench.delete",
+          "when": "false"
+        },
+        {
+          "command": "csharpWorkbench.copy",
+          "when": "false"
+        },
+        {
+          "command": "csharpWorkbench.paste",
+          "when": "false"
+        },
+        {
+          "command": "csharpWorkbench.copyPath",
+          "when": "false"
+        },
+        {
+          "command": "csharpWorkbench.revealInFinder",
+          "when": "false"
+        },
+        {
+          "command": "csharpWorkbench.openInTerminal",
+          "when": "false"
         }
       ],
       "view/title": [
@@ -103,6 +211,75 @@
           "command": "csharpWorkbench.hideAllFiles",
           "when": "view == csharpWorkbench.solutionExplorer && csharpWorkbench.showAllFiles",
           "group": "navigation@3"
+        }
+      ],
+      "view/item/context": [
+        {
+          "submenu": "csharpWorkbench.add",
+          "when": "viewItem =~ /^cw\\.(project|folder)/",
+          "group": "2_add"
+        },
+        {
+          "command": "csharpWorkbench.rename",
+          "when": "viewItem =~ /^cw\\.(file|folder)/",
+          "group": "6_edit@1"
+        },
+        {
+          "command": "csharpWorkbench.delete",
+          "when": "viewItem =~ /^cw\\.(file|folder)/",
+          "group": "6_edit@2"
+        },
+        {
+          "command": "csharpWorkbench.copy",
+          "when": "viewItem =~ /^cw\\.(file|folder)/",
+          "group": "6_edit@3"
+        },
+        {
+          "command": "csharpWorkbench.paste",
+          "when": "viewItem =~ /^cw\\.(project|folder)/",
+          "group": "6_edit@4"
+        },
+        {
+          "command": "csharpWorkbench.copyPath",
+          "when": "viewItem =~ /^cw\\.(file|folder|project)/",
+          "group": "6_edit@5"
+        },
+        {
+          "command": "csharpWorkbench.revealInFinder",
+          "when": "viewItem =~ /^cw\\.(file|folder|project)/",
+          "group": "5_os@1"
+        },
+        {
+          "command": "csharpWorkbench.openInTerminal",
+          "when": "viewItem =~ /^cw\\.(file|folder|project)/",
+          "group": "5_os@2"
+        }
+      ],
+      "csharpWorkbench.add": [
+        {
+          "command": "csharpWorkbench.newItem",
+          "when": "viewItem =~ /^cw\\.(project|folder)/",
+          "group": "1_add@1"
+        },
+        {
+          "command": "csharpWorkbench.newClass",
+          "when": "viewItem =~ /^cw\\.(project|folder)/",
+          "group": "1_add@2"
+        },
+        {
+          "command": "csharpWorkbench.newInterface",
+          "when": "viewItem =~ /^cw\\.(project|folder)/",
+          "group": "1_add@3"
+        },
+        {
+          "command": "csharpWorkbench.newFolder",
+          "when": "viewItem =~ /^cw\\.(project|folder)/",
+          "group": "1_add@4"
+        },
+        {
+          "command": "csharpWorkbench.addExistingItem",
+          "when": "viewItem =~ /^cw\\.(project|folder)/",
+          "group": "1_add@5"
         }
       ]
     },
@@ -144,6 +321,12 @@
         "view": "csharpWorkbench.solutionExplorer",
         "contents": "%viewsWelcome.noSolution%",
         "when": "!csharpWorkbench.hasSolution"
+      }
+    ],
+    "submenus": [
+      {
+        "id": "csharpWorkbench.add",
+        "label": "%submenu.add.label%"
       }
     ]
   },
