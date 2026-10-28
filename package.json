@@ -13,7 +13,7 @@
     "build": "node esbuild.mjs",
     "watch": "node esbuild.mjs --watch",
     "test:unit": "node scripts/vitest-safe.mjs run --exclude '**/*.int.test.ts' --exclude '**/node_modules/**'",
-    "test:cli": "node scripts/vitest-safe.mjs run test/integration/cli-cpm.int.test.ts",
+    "test:cli": "node scripts/vitest-safe.mjs run test/integration/cli-cpm.int.test.ts test/integration/slnFolders.int.test.ts",
     "test:int": "node scripts/vscode-test-safe.mjs",
     "build:test": "node esbuild.mjs --tests",
     "package": "vsce package --allow-missing-repository"
