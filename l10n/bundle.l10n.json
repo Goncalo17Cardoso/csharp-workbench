@@ -44,5 +44,13 @@
   "Delete {0}?": "Delete {0}?",
   "Delete {0} items?": "Delete {0} items?",
   "Items are moved to the Trash.": "Items are moved to the Trash.",
-  "Delete": "Delete"
+  "Delete": "Delete",
+  "A name is required.": "A name is required.",
+  "A name cannot contain any of: / \\ : * ? \" < > |": "A name cannot contain any of: / \\ : * ? \" < > |",
+  "A folder cannot be pasted into itself.": "A folder cannot be pasted into itself.",
+  "Class": "Class",
+  "Interface": "Interface",
+  "Enum": "Enum",
+  "Record": "Record",
+  "Struct": "Struct"
 }

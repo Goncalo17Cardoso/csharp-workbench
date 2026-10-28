@@ -6,7 +6,7 @@ import { readPackageRefs } from '../workspace/projectFiles';
 import type { TreeNode } from './model';
 import { readProjectInfo } from './projectInfo';
 import { loadProjectItems, walkProjectDir } from './projectItems';
-import { validateDrop } from './commands/files';
+import { dedupeNested, FileExistsError, validateDrop } from './commands/files';
 import { loadSolution } from './slnParse';
 import { getSelectedSolution, getStartupProject, setSelectedSolution } from './state';
 import { SolutionTreeCore } from './treeCore';
@@ -113,7 +113,7 @@ export class SolutionTreeProvider implements vscode.TreeDataProvider<TreeNode>, 
         if (movable.length > 0) data.set(mime, new vscode.DataTransferItem(movable.map((n) => n.path!)));
       },
       handleDrop: async (target, data) => {
-        const sources = data.get(mime)?.value as string[] | undefined;
+        const sources = dedupeNested((data.get(mime)?.value as string[] | undefined) ?? []);
         if (!sources?.length || !target || !target.path || (target.kind !== 'folder' && target.kind !== 'project')) return;
         const dir = target.kind === 'project' ? path.dirname(target.path) : target.path;
         const err = validateDrop(this.core, sources, dir);
@@ -126,11 +126,13 @@ export class SolutionTreeProvider implements vscode.TreeDataProvider<TreeNode>, 
           for (const s of sources) {
             if (path.dirname(s) === dir) continue;
             const dest = path.join(dir, path.basename(s));
-            if (await fsp.access(dest).then(() => true, () => false)) throw new Error(vscode.l10n.t('File already exists: {0}', path.basename(s)));
+            if (await fsp.access(dest).then(() => true, () => false)) throw new FileExistsError(path.basename(s));
             await vscode.workspace.fs.rename(vscode.Uri.file(s), vscode.Uri.file(dest));
           }
-          this.invalidatePath(dir);
-        } catch (e) { void vscode.window.showErrorMessage(e instanceof Error ? e.message : String(e)); }
+        } catch (e) {
+          void vscode.window.showErrorMessage(e instanceof FileExistsError
+            ? vscode.l10n.t('File already exists: {0}', e.fileName) : e instanceof Error ? e.message : String(e));
+        } finally { this.invalidatePath(dir); }
       },
     };
   }

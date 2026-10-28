@@ -1,4 +1,4 @@
-import { basename, extname, isAbsolute, join, relative } from 'node:path';
+import { basename, extname, isAbsolute, join, relative, resolve } from 'node:path';
 import { renderCodeTemplate, type CodeKind } from '../codeTemplates';
 import type { ProjectInfoData } from '../model';
 import { namespaceFor, toIdentifier } from '../naming';
@@ -21,8 +21,29 @@ export function targetPathFor(folder: string, name: string, ext: string): string
   return join(folder, name.toLowerCase().endsWith(ext.toLowerCase()) ? name : `${name}${ext}`);
 }
 
+/** Thrown instead of an English message so the glue can translate it. */
+export class FileExistsError extends Error {
+  readonly code = 'exists';
+  constructor(readonly fileName: string) { super(`File already exists: ${fileName}`); }
+}
+
 export async function ensureNotExists(path: string, exists: (p: string) => Promise<boolean>): Promise<void> {
-  if (await exists(path)) throw new Error(`File already exists: ${basename(path)}`);
+  if (await exists(path)) throw new FileExistsError(basename(path));
+}
+
+/** Drops every path that lies inside another path of the list (and duplicates). */
+export function dedupeNested(paths: string[]): string[] {
+  const uniq = [...new Set(paths)];
+  return uniq.filter((p) => !uniq.some((o) => o !== p && isDescendantOrSelf(o, p)));
+}
+
+/** True when `target` is the same path as `source` ignoring case (a case-only rename). */
+export function isSamePathIgnoreCase(source: string, target: string): boolean {
+  return resolve(source).toLowerCase() === resolve(target).toLowerCase();
+}
+
+export function canPasteInto(sources: string[], folder: string): boolean {
+  return !sources.some((s) => isDescendantOrSelf(s, folder));
 }
 
 /** VS-style clash names: `X - Copy.cs`, then `X - Copy (2).cs`. Returns `name` itself when free. */
@@ -35,10 +56,12 @@ export function copyName(existing: Set<string>, name: string): string {
   return candidate;
 }
 
-export function validateName(name: string, exists: (fileName: string) => boolean): string | undefined {
-  if (name.trim() === '') return 'A name is required.';
-  if (/[/\\:*?"<>|]/.test(name)) return 'A name cannot contain any of: / \\ : * ? " < > |';
-  if (exists(name)) return `File already exists: ${name}`;
+export type NameError = { code: 'empty' } | { code: 'chars' } | { code: 'exists'; name: string };
+
+export function validateName(name: string, exists: (fileName: string) => boolean): NameError | undefined {
+  if (name.trim() === '') return { code: 'empty' };
+  if (/[/\\:*?"<>|]/.test(name)) return { code: 'chars' };
+  if (exists(name)) return { code: 'exists', name };
   return undefined;
 }
 
@@ -83,7 +106,7 @@ export async function createBuiltIn(
   const file = targetPathFor(folder, name, '.cs');
   await ensureNotExists(file, deps.exists);
   const ns = namespaceFor(info.rootNamespace, projectDir, folder);
-  await deps.write(file, renderCodeTemplate(kind, toIdentifier(basename(name, '.cs')), ns, info.fileScopedNamespaces));
+  await deps.write(file, renderCodeTemplate(kind, toIdentifier(name.replace(/\.cs$/i, '')), ns, info.fileScopedNamespaces));
   return file;
 }
 

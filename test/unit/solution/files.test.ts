@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { renderCodeTemplate } from '../../../src/solution/codeTemplates';
 import {
-  copyName, createBuiltIn, createFromCatalog, ensureNotExists, isSameProject, newItemChoices, targetPathFor,
+  canPasteInto, dedupeNested, FileExistsError, isSamePathIgnoreCase, copyName, createBuiltIn, createFromCatalog, ensureNotExists, isSameProject, newItemChoices, targetPathFor,
   validateDrop, validateName,
 } from '../../../src/solution/commands/files';
 import type { ProjectInfoData } from '../../../src/solution/model';
@@ -21,7 +21,7 @@ describe('pure helpers', () => {
     expect(targetPathFor('/a', 'X.cs', '.cs')).toBe('/a/X.cs');
   });
   it('ensureNotExists throws for an existing file', async () => {
-    await expect(ensureNotExists('/a/X.cs', async () => true)).rejects.toThrow('File already exists: X.cs');
+    await expect(ensureNotExists('/a/X.cs', async () => true)).rejects.toBeInstanceOf(FileExistsError);
     await expect(ensureNotExists('/a/X.cs', async () => false)).resolves.toBeUndefined();
   });
   it('copyName produces "X - Copy.cs" then "X - Copy (2).cs"', () => {
@@ -31,16 +31,37 @@ describe('pure helpers', () => {
     expect(copyName(new Set(), 'Y.cs')).toBe('Y.cs');
   });
   it('validateName rejects empty, illegal chars and existing', () => {
-    expect(validateName('', () => false)).toBeTruthy();
-    expect(validateName('a/b', () => false)).toBeTruthy();
-    expect(validateName('a?', () => false)).toBeTruthy();
-    expect(validateName('X', () => true)).toBe('File already exists: X');
+    
+    expect(validateName('', () => false)).toEqual({ code: 'empty' });
+    expect(validateName('a/b', () => false)).toEqual({ code: 'chars' });
+    expect(validateName('a?', () => false)).toEqual({ code: 'chars' });
+    expect(validateName('X', () => true)).toEqual({ code: 'exists', name: 'X' });
     expect(validateName('X', () => false)).toBeUndefined();
   });
   it('isSameProject', () => {
     expect(isSameProject(core, '/s/Core/a.cs', '/s/Core/sub')).toBe(true);
     expect(isSameProject(core, '/s/Core/a.cs', '/s/Web/b.cs')).toBe(false);
     expect(isSameProject(core, '/x/a.cs', '/x/b.cs')).toBe(false);
+  });
+});
+
+describe('multi-select guards', () => {
+  it('dedupeNested drops children and duplicates', () => {
+    expect(dedupeNested(['/a/Dir', '/a/Dir/x.cs', '/a/Dir2', '/a/Dir'])).toEqual(['/a/Dir', '/a/Dir2']);
+  });
+  it('canPasteInto refuses self and descendants', () => {
+    expect(canPasteInto(['/a/Dir'], '/a/Dir')).toBe(false);
+    expect(canPasteInto(['/a/Dir'], '/a/Dir/Sub')).toBe(false);
+    expect(canPasteInto(['/a/Dir'], '/a/Dir2')).toBe(true);
+  });
+  it('case-only rename is the same path', () => {
+    expect(isSamePathIgnoreCase('/a/foo.cs', '/a/Foo.cs')).toBe(true);
+    expect(isSamePathIgnoreCase('/a/foo.cs', '/a/bar.cs')).toBe(false);
+  });
+  it('strips .CS case-insensitively for the type name', async () => {
+    const write = vi.fn(async () => {});
+    await createBuiltIn({ exists: async () => false, write }, 'class', 'Foo.CS', '/s/Core', '/s/Core', info);
+    expect(write).toHaveBeenCalledWith('/s/Core/Foo.CS', renderCodeTemplate('class', 'Foo', 'MyApp.Core', true));
   });
 });
 
@@ -89,7 +110,7 @@ describe('createBuiltIn', () => {
   it('newItem refuses existing file', async () => {
     const write = vi.fn(async () => {});
     await expect(createBuiltIn({ exists: async () => true, write }, 'class', 'Customer', '/s/Core', '/s/Core', info))
-      .rejects.toThrow('File already exists: Customer.cs');
+      .rejects.toMatchObject({ code: 'exists', fileName: 'Customer.cs' });
     expect(write).not.toHaveBeenCalled();
   });
 });

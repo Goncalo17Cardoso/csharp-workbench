@@ -1,4 +1,3 @@
-import { existsSync } from 'node:fs';
 import * as fsp from 'node:fs/promises';
 import * as path from 'node:path';
 import * as vscode from 'vscode';
@@ -11,7 +10,7 @@ import { readProjectInfo } from '../projectInfo';
 import { TemplateCatalog } from '../templateCatalog';
 import type { SolutionTreeProvider } from '../SolutionTreeProvider';
 import {
-  copyName, createBuiltIn, createFromCatalog, ensureNotExists, newItemChoices, validateName,
+  canPasteInto, copyName, dedupeNested, FileExistsError, isSamePathIgnoreCase, type NameError, createBuiltIn, createFromCatalog, ensureNotExists, newItemChoices, validateName,
 } from './files';
 
 interface Deps {
@@ -19,6 +18,19 @@ interface Deps {
   getCli(): Promise<DotnetCli | undefined>;
   showOutput(): void;
 }
+
+const tName = (e: NameError) =>
+  e.code === 'empty' ? vscode.l10n.t('A name is required.')
+    : e.code === 'chars' ? vscode.l10n.t('A name cannot contain any of: / \\ : * ? " < > |')
+      : vscode.l10n.t('File already exists: {0}', e.name);
+const errText = (e: unknown) =>
+  e instanceof FileExistsError ? vscode.l10n.t('File already exists: {0}', e.fileName) : e instanceof Error ? e.message : String(e);
+
+const tLabel = (l: string) => ({
+  Code: vscode.l10n.t('Code'), Templates: vscode.l10n.t('Templates'), Class: vscode.l10n.t('Class'),
+  Interface: vscode.l10n.t('Interface'), Enum: vscode.l10n.t('Enum'), Record: vscode.l10n.t('Record'),
+  Struct: vscode.l10n.t('Struct'),
+} as Record<string, string>)[l] ?? l;
 
 const exists = (p: string) => fsp.access(p).then(() => true, () => false);
 
@@ -41,7 +53,7 @@ export function registerFileCommands(deps: Deps): vscode.Disposable[] {
   const selection = (node?: TreeNode, nodes?: TreeNode[]) => (nodes?.length ? nodes : node ? [node] : []);
   const folderOf = (n: TreeNode) => n.kind === 'file' ? path.dirname(n.path!) : n.kind === 'project' ? path.dirname(n.path!) : n.path!;
   const projectOf = (p: string) => core.projectForPath(p);
-  const fail = (e: unknown) => void vscode.window.showErrorMessage(e instanceof Error ? e.message : String(e));
+  const fail = (e: unknown) => void vscode.window.showErrorMessage(errText(e));
   const touch = (p: string) => provider.invalidatePath(p);
   const open = (p: string) => vscode.window.showTextDocument(vscode.Uri.file(p));
 
@@ -54,9 +66,11 @@ export function registerFileCommands(deps: Deps): vscode.Disposable[] {
   async function askName(folder: string, prompt: string, ext: string): Promise<string | undefined> {
     return vscode.window.showInputBox({
       prompt, placeHolder: ext ? vscode.l10n.t('Name (default extension {0})', ext) : undefined,
-      validateInput: (v) => {
-        const err = validateName(v, (n) => existsSync(path.join(folder, ext && !n.toLowerCase().endsWith(ext) ? n + ext : n)));
-        return err ? vscode.l10n.t(err) : undefined;
+      validateInput: async (v) => {
+        const err = validateName(v, () => false);
+        if (err) return tName(err);
+        return await exists(path.join(folder, ext && !v.toLowerCase().endsWith(ext) ? v + ext : v))
+          ? tName({ code: 'exists', name: v }) : undefined;
       },
     });
   }
@@ -84,7 +98,7 @@ export function registerFileCommands(deps: Deps): vscode.Disposable[] {
     if (!proj || !cli) { fail(new Error(vscode.l10n.t('The .NET SDK was not found'))); return; }
     const name = await vscode.window.showInputBox({
       prompt: vscode.l10n.t('Name'),
-      validateInput: (v) => { const e = validateName(v, () => false); return e ? vscode.l10n.t(e) : undefined; },
+      validateInput: (v) => { const e = validateName(v, () => false); return e ? tName(e) : undefined; },
     });
     if (!name) return;
     const info = await infoFor(proj.path);
@@ -109,7 +123,7 @@ export function registerFileCommands(deps: Deps): vscode.Disposable[] {
     const qp = vscode.window.createQuickPick<vscode.QuickPickItem & { choice?: ReturnType<typeof newItemChoices>[number] }>();
     qp.placeholder = vscode.l10n.t('Select an item template');
     const toItems = (list: Parameters<typeof newItemChoices>[0]) => newItemChoices(list).map((c) => ({
-      label: c.kind === 'separator' ? (c.label === 'Code' ? vscode.l10n.t('Code') : vscode.l10n.t('Templates')) : c.label,
+      label: c.kind === 'template' ? c.label : tLabel(c.label),
       kind: c.kind === 'separator' ? vscode.QuickPickItemKind.Separator : undefined,
       description: c.kind === 'template' ? c.description : undefined, choice: c,
     }));
@@ -154,8 +168,7 @@ export function registerFileCommands(deps: Deps): vscode.Disposable[] {
         await ensureNotExists(target, exists);
         await vscode.workspace.fs.copy(u, vscode.Uri.file(target));
       }
-      touch(folder);
-    } catch (e) { fail(e); }
+    } catch (e) { fail(e); } finally { touch(folder); }
   }
 
   async function rename(node?: TreeNode): Promise<void> {
@@ -164,29 +177,30 @@ export function registerFileCommands(deps: Deps): vscode.Disposable[] {
     const dir = path.dirname(node.path);
     const name = await vscode.window.showInputBox({
       value: old, valueSelection: [0, old.length - path.extname(old).length],
-      validateInput: (v) => {
+      validateInput: async (v) => {
         if (v === old) return undefined;
-        const e = validateName(v, (n) => existsSync(path.join(dir, n)));
-        return e ? vscode.l10n.t(e) : undefined;
+        const e = validateName(v, () => false);
+        if (e) return tName(e);
+        const t = path.join(dir, v);
+        return !isSamePathIgnoreCase(node.path!, t) && await exists(t) ? tName({ code: 'exists', name: v }) : undefined;
       },
     });
     if (!name || name === old) return;
     try {
       await vscode.workspace.fs.rename(vscode.Uri.file(node.path), vscode.Uri.file(path.join(dir, name)));
-      touch(dir);
-    } catch (e) { fail(e); }
+    } catch (e) { fail(e); } finally { touch(dir); }
   }
 
   async function del(node?: TreeNode, nodes?: TreeNode[]): Promise<void> {
-    const sel = selection(node, nodes).filter((n) => n.path);
+    const keep = new Set(dedupeNested(selection(node, nodes).filter((n) => n.path).map((n) => n.path!)));
+    const sel = selection(node, nodes).filter((n) => n.path && keep.delete(n.path));
     if (sel.length === 0) return;
     const msg = sel.length === 1
       ? vscode.l10n.t('Delete {0}?', sel[0].label) : vscode.l10n.t('Delete {0} items?', sel.length);
     if (!(await confirmAction(msg, vscode.l10n.t('Items are moved to the Trash.'), vscode.l10n.t('Delete')))) return;
     try {
       for (const n of sel) await vscode.workspace.fs.delete(vscode.Uri.file(n.path!), { recursive: true, useTrash: true });
-      for (const n of sel) touch(n.path!);
-    } catch (e) { fail(e); }
+    } catch (e) { fail(e); } finally { for (const n of sel) touch(n.path!); }
   }
 
   const copy = (node?: TreeNode, nodes?: TreeNode[]) => {
@@ -196,6 +210,7 @@ export function registerFileCommands(deps: Deps): vscode.Disposable[] {
   async function paste(node?: TreeNode): Promise<void> {
     if (!node || clipboard.length === 0) return;
     const folder = folderOf(node);
+    if (!canPasteInto(clipboard, folder)) { fail(new Error(vscode.l10n.t('A folder cannot be pasted into itself.'))); return; }
     try {
       const names = new Set((await fsp.readdir(folder)));
       for (const src of clipboard) {
