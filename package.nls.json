@@ -44,5 +44,6 @@
   "command.debugStartup.title": "Debug Startup Project",
   "command.buildSolution.title": "Build Solution",
   "command.rebuildSolution.title": "Rebuild Solution",
-  "command.cleanSolution.title": "Clean Solution"
+  "command.cleanSolution.title": "Clean Solution",
+  "command.manageUserSecrets.title": "Manage User Secrets"
 }

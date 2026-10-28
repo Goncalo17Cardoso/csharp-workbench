@@ -59,3 +59,37 @@ describe('task 10 menu scopes', () => {
     }
   });
 });
+
+describe('task 11 final menus', () => {
+  const ctx = menus['view/item/context'] as Array<{ command?: string; submenu?: string; when?: string; group?: string }>;
+  const VALUES = ['cw.solution', 'cw.solutionFolder', 'cw.project', 'cw.project.startup', 'cw.folder', 'cw.file', 'cw.packages', 'cw.package', 'cw.projectRefs', 'cw.projectRef'];
+  it('every entry has group@order', () => {
+    for (const m of ctx) expect(m.group, m.command ?? m.submenu).toMatch(/^[1-7]_[a-z]+@\d+(\.\d+)?$/);
+  });
+  it('no command twice in the same menu with overlapping when', () => {
+    for (const [name, list] of Object.entries(menus)) {
+      const seen = new Map<string, string[]>();
+      for (const m of list.filter((x) => x.command && x.when && /viewItem =~/.test(x.when))) {
+        const re = regexOf(m.when!);
+        const hits = VALUES.filter((v) => re.test(v));
+        const prev = seen.get(m.command!) ?? [];
+        expect(hits.filter((h) => prev.includes(h)), `${name} ${m.command}`).toEqual([]);
+        seen.set(m.command!, [...prev, ...hits]);
+      }
+    }
+  });
+  it('user secrets matches projects only', () => {
+    const m = ctx.find((x) => x.command === 'csharpWorkbench.manageUserSecrets')!;
+    const re = regexOf(m.when!);
+    expect(re.test('cw.project')).toBe(true);
+    expect(re.test('cw.project.startup')).toBe(true);
+    expect(re.test('cw.projectRef')).toBe(false);
+    expect(re.test('cw.projectRefs')).toBe(false);
+    expect(m.group).toBe('4_manage@2');
+  });
+  it('commands are hidden from the palette except the allowed ones', () => {
+    const shown = menus.commandPalette.filter((m) => m.when !== 'false').map((m) => m.command);
+    expect(shown.sort()).toEqual(['csharpWorkbench.manageNuget']);
+    expect(menus.commandPalette.some((m) => m.command === 'csharpWorkbench.manageUserSecrets' && m.when === 'false')).toBe(true);
+  });
+});

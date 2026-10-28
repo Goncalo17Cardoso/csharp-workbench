@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
@@ -16,5 +16,17 @@ describe('l10n bundle', () => {
     const files = ['src/extension.ts', 'src/panel/PanelManager.ts', 'src/panel/controller.ts', 'src/ops/operations.ts'];
     const missing = files.flatMap((f) => messages(read(f))).filter((m) => !(m in bundle));
     expect(missing).toEqual([]);
+  });
+});
+
+describe('l10n bundle covers src', () => {
+  it('has every vscode.l10n.t literal in src', () => {
+    const bundle = JSON.parse(read('l10n/bundle.l10n.json')) as Record<string, string>;
+    const walk = (d: string): string[] => readdirSync(join(root, d), { withFileTypes: true })
+      .flatMap((e) => (e.isDirectory() ? walk(join(d, e.name)) : e.name.endsWith('.ts') ? [join(d, e.name)] : []));
+    const found = walk('src').flatMap((f) =>
+      [...read(f).matchAll(/l10n\.t\(\s*'((?:[^'\\]|\\.)*)'/g)].map((m) => m[1].replace(/\\(.)/g, (_x, c: string) => (c === 'n' ? '\n' : c))));
+    expect(found.length).toBeGreaterThan(20);
+    expect(found.filter((m) => !(m in bundle))).toEqual([]);
   });
 });
