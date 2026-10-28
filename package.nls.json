@@ -47,5 +47,7 @@
   "command.cleanSolution.title": "Clean Solution",
   "command.manageUserSecrets.title": "Manage User Secrets",
   "viewsContainers.solutionExplorer.title": "Solution Explorer",
-  "views.solutionExplorer.name": "Solution Explorer"
+  "views.solutionExplorer.name": "Solution Explorer",
+  "command.projectProperties.title": "Properties",
+  "command.projectProperties.save.title": "Save Project Properties"
 }

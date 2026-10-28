@@ -21,6 +21,12 @@ const webviewOptions = {
   sourcemap: true,
 };
 
+const propsOptions = {
+  ...webviewOptions,
+  entryPoints: ['src/webview/properties/main.ts'],
+  outfile: 'dist/webview/properties.js',
+};
+
 if (process.argv.includes('--tests')) {
   // Integration tests run inside the VS Code extension host: bundle each *.e2e.test.ts to out/.
   const { globSync } = await import('node:fs');
@@ -37,7 +43,9 @@ if (process.argv.includes('--tests')) {
 } else if (process.argv.includes('--watch')) {
   await (await context(options)).watch();
   await (await context(webviewOptions)).watch();
+  await (await context(propsOptions)).watch();
 } else {
   await build(options);
   await build(webviewOptions);
+  await build(propsOptions);
 }

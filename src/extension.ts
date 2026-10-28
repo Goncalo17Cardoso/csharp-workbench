@@ -10,6 +10,7 @@ import { findDotnet } from './dotnet/locate';
 import { createOutput } from './output';
 import { PanelManager, type PanelTestHooks } from './panel/PanelManager';
 import type { ToHost } from './panel/protocol';
+import { registerPropertiesCommands } from './properties/commands';
 import { registerFileCommands } from './solution/commands/fileCommands';
 import { registerRunCommands } from './solution/commands/run';
 import { registerSecretsCommands } from './solution/commands/secrets';
@@ -165,6 +166,12 @@ export function activate(context: vscode.ExtensionContext): ExtensionApi | undef
   }));
 
   context.subscriptions.push(...registerSecretsCommands({
+    getCli: async () => { const d = await resolveDotnet(); return d ? new DotnetCli(nodeExec, d, output) : undefined; },
+  }));
+
+  context.subscriptions.push(...registerPropertiesCommands({
+    extensionUri: context.extensionUri,
+    provider: explorer,
     getCli: async () => { const d = await resolveDotnet(); return d ? new DotnetCli(nodeExec, d, output) : undefined; },
   }));
 

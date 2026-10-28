@@ -185,6 +185,16 @@
         "category": "C# Workbench"
       },
       {
+        "command": "csharpWorkbench.projectProperties",
+        "title": "%command.projectProperties.title%",
+        "category": "C# Workbench"
+      },
+      {
+        "command": "csharpWorkbench.projectProperties.save",
+        "title": "%command.projectProperties.save.title%",
+        "category": "C# Workbench"
+      },
+      {
         "command": "csharpWorkbench.manageNugetForSolution",
         "title": "%command.manageNugetForSolution.title%",
         "category": "C# Workbench"
@@ -260,6 +270,14 @@
         "command": "csharpWorkbench.cleanSolution",
         "title": "%command.cleanSolution.title%",
         "category": "C# Workbench"
+      }
+    ],
+    "keybindings": [
+      {
+        "command": "csharpWorkbench.projectProperties.save",
+        "key": "ctrl+s",
+        "mac": "cmd+s",
+        "when": "activeWebviewPanelId == 'csharpWorkbench.properties'"
       }
     ],
     "menus": {
@@ -416,6 +434,10 @@
         },
         {
           "command": "csharpWorkbench.manageUserSecrets",
+          "when": "false"
+        },
+        {
+          "command": "csharpWorkbench.projectProperties.save",
           "when": "false"
         }
       ],
@@ -601,6 +623,11 @@
           "command": "csharpWorkbench.manageUserSecrets",
           "when": "viewItem =~ /^cw\\.project(\\.|$)/",
           "group": "4_manage@2"
+        },
+        {
+          "command": "csharpWorkbench.projectProperties",
+          "when": "viewItem =~ /^cw\\.project(\\.|$)/",
+          "group": "9_properties@1"
         }
       ],
       "csharpWorkbench.add": [
