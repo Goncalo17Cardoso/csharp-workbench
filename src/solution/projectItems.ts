@@ -1,5 +1,4 @@
-import { join } from 'node:path';
-import { DotnetError } from '../dotnet/exec';
+import { dirname, join } from 'node:path';
 import type { DotnetCli } from '../dotnet/cli';
 import { parseGetItems } from '../dotnet/parse';
 import type { ProjectItem, ProjectItems } from './model';
@@ -28,7 +27,11 @@ export async function loadProjectItems(
   fs: WalkFs,
 ): Promise<ProjectItems> {
   try {
-    const byType = parseGetItems(await cli.getItems(projectPath, ITEM_TYPES));
+    const raw = await cli.getItems(projectPath, ITEM_TYPES);
+    const start = raw.indexOf('{');
+    const doc = JSON.parse(start >= 0 ? raw.slice(start) : raw);
+    if (!doc || typeof doc !== 'object' || !doc.Items || typeof doc.Items !== 'object') throw new Error('msbuild output has no Items');
+    const byType = parseGetItems(raw);
     const merged = new Map<string, ProjectItem>();
     for (const list of Object.values(byType)) {
       for (const i of list) {
@@ -39,9 +42,12 @@ export async function loadProjectItems(
     }
     return { items: [...merged.values()], evaluated: true };
   } catch (e) {
-    if (!(e instanceof DotnetError)) throw e;
-    const dir = projectPath.replace(/[\\/][^\\/]*$/, '');
-    const files = await walkProjectDir(dir, fs);
-    return { items: files.map((fullPath) => ({ fullPath })), evaluated: false, error: e.message };
+    const message = e instanceof Error ? e.message : String(e);
+    try {
+      const files = await walkProjectDir(dirname(projectPath), fs);
+      return { items: files.map((fullPath) => ({ fullPath })), evaluated: false, error: message };
+    } catch (w) {
+      return { items: [], evaluated: false, error: `${message}; ${w instanceof Error ? w.message : String(w)}` };
+    }
   }
 }

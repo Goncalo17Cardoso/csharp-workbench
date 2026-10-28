@@ -43,4 +43,17 @@ describe('loadProjectItems', () => {
     expect(r.error).toContain('boom');
     expect(r.items.map((i) => i.fullPath.slice(dir.length + 1)).sort()).toEqual(['a.csproj', 'src/B.cs']);
   });
+  it.each(['not json', '{}', '{"Result":"x"}'])('falls back on unusable output %s', async (out) => {
+    const r = await loadProjectItems(join(dir, 'a.csproj'), { getItems: async () => out }, fs);
+    expect(r.evaluated).toBe(false);
+    expect(r.error).toBeTruthy();
+    expect(r.items.map((i) => i.fullPath.slice(dir.length + 1)).sort()).toEqual(['a.csproj', 'src/B.cs']);
+  });
+  it('never throws when the walk fails too', async () => {
+    const cli = { getItems: async () => { throw new Error('boom'); } };
+    const r = await loadProjectItems(join(dir, 'missing', 'a.csproj'), cli, fs);
+    expect(r.items).toEqual([]);
+    expect(r.evaluated).toBe(false);
+    expect(r.error).toMatch(/^boom; /);
+  });
 });

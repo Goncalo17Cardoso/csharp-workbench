@@ -20,6 +20,8 @@ describe('readProjectInfo', () => {
   it('keeps UserSecretsId and 1.10-like strings', () => {
     const i = readProjectInfo('/w/a.csproj', proj('<PropertyGroup><UserSecretsId>abc-1</UserSecretsId></PropertyGroup>'));
     expect(i.userSecretsId).toBe('abc-1');
+    const j = readProjectInfo('/w/a.csproj', proj('<PropertyGroup><RootNamespace>1.10</RootNamespace></PropertyGroup>'));
+    expect(j.rootNamespace).toBe('1.10');
   });
   it('file-scoped when net8.0 and no LangVersion', () => {
     const p = (b: string) => readProjectInfo('/w/a.csproj', proj(`<PropertyGroup>${b}</PropertyGroup>`)).fileScopedNamespaces;
