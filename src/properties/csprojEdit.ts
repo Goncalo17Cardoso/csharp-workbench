@@ -5,14 +5,18 @@
 //
 // Choices:
 // - Several edits of the same property name in one call: the last one wins.
-// - `remove` deletes only the last unconditional occurrence (the effective one). If an
-//   earlier unconditional duplicate remains, the postcondition fails rather than
-//   silently letting the duplicate take over.
+// - A `targetFrameworks` edit owns both TargetFramework and TargetFrameworks: a second
+//   `targetFrameworks` edit, or a plain set/remove of either name, in the same call
+//   throws PropertyEditError('invalidName').
+// - `remove` deletes ALL unconditional occurrences, so the property goes back to
+//   inherited (or conditional-only). Conditional occurrences are kept.
 // - A PropertyGroup without a real `</PropertyGroup>` (malformed XML; the scanner keeps
 //   closeStart === openEnd) is never inserted into: PropertyEditError('postcondition').
 //   We do not skip to a later group, because the scanner stops recording groups after
 //   an unclosed one and the file is not valid MSBuild anyway.
-// - `targetFrameworks` with an empty list throws PropertyEditError('invalidName').
+// - Values with CR, LF or other XML-illegal control characters (U+0000-U+001F except
+//   TAB), and an empty `targetFrameworks` list, throw PropertyEditError('invalidValue').
+// - Splices must not overlap (checked before any text is built): 'postcondition'.
 
 import { scanCsproj, originOf, type CsprojScan, type PropertyOccurrence } from './csprojScan';
 
@@ -21,7 +25,7 @@ export type PropertyEdit =
   | { kind: 'remove'; name: string }
   | { kind: 'targetFrameworks'; tfms: string[] }; // 1 → TargetFramework, >1 → TargetFrameworks; removes the other one
 
-export type PropertyEditErrorCode = 'conditional' | 'postcondition' | 'invalidName';
+export type PropertyEditErrorCode = 'conditional' | 'postcondition' | 'invalidName' | 'invalidValue';
 
 export class PropertyEditError extends Error {
   constructor(public readonly code: PropertyEditErrorCode, message?: string) {
@@ -31,6 +35,8 @@ export class PropertyEditError extends Error {
 }
 
 const NAME_RE = /^[A-Za-z_][A-Za-z0-9_.-]*$/;
+const ILLEGAL_VALUE_RE = /[\u0000-\u0008\u000A-\u001F]/;
+const TF_NAMES = new Set(['TargetFramework', 'TargetFrameworks']);
 
 type Op = { kind: 'set'; name: string; value: string } | { kind: 'remove'; name: string } | { kind: 'rename'; from: PropertyOccurrence; name: string; value: string };
 
@@ -44,6 +50,12 @@ function checkName(name: string): void {
   if (!NAME_RE.test(name)) throw new PropertyEditError('invalidName', `Invalid property name: ${JSON.stringify(name)}`);
 }
 
+function checkValue(value: string): void {
+  if (ILLEGAL_VALUE_RE.test(value)) {
+    throw new PropertyEditError('invalidValue', `Invalid property value: ${JSON.stringify(value)}`);
+  }
+}
+
 /** Open-tag attributes (with leading whitespace) of an element, without `>` or `/>`. */
 function attrsOf(xml: string, o: PropertyOccurrence): string {
   const openEnd = o.selfClosing ? o.end : o.valueStart;
@@ -55,9 +67,14 @@ function attrsOf(xml: string, o: PropertyOccurrence): string {
 function normalize(scan: CsprojScan, edits: PropertyEdit[]): Op[] {
   const byName = new Map<string, Op>();
   const put = (op: Op) => { byName.delete(op.name); byName.set(op.name, op); };
+  const tfEdits = edits.filter((e) => e.kind === 'targetFrameworks').length;
+  if (tfEdits > 1 || (tfEdits === 1 && edits.some((e) => e.kind !== 'targetFrameworks' && TF_NAMES.has(e.name)))) {
+    throw new PropertyEditError('invalidName', 'targetFrameworks cannot be combined with other TargetFramework(s) edits');
+  }
   for (const e of edits) {
     if (e.kind === 'targetFrameworks') {
-      if (e.tfms.length === 0) throw new PropertyEditError('invalidName', 'targetFrameworks needs at least one TFM');
+      if (e.tfms.length === 0) throw new PropertyEditError('invalidValue', 'targetFrameworks needs at least one TFM');
+      e.tfms.forEach(checkValue);
       const [want, other] = e.tfms.length === 1 ? ['TargetFramework', 'TargetFrameworks'] : ['TargetFrameworks', 'TargetFramework'];
       const value = e.tfms.join(';');
       const wantOrigin = originOf(scan, want).origin;
@@ -73,6 +90,7 @@ function normalize(scan: CsprojScan, edits: PropertyEdit[]): Op[] {
       continue;
     }
     checkName(e.name);
+    if (e.kind === 'set') checkValue(e.value);
     put(e.kind === 'set' ? { kind: 'set', name: e.name, value: e.value } : { kind: 'remove', name: e.name });
   }
   return [...byName.values()];
@@ -83,7 +101,7 @@ function removalRange(xml: string, o: PropertyOccurrence): { start: number; end:
   while (s > 0 && (xml[s - 1] === ' ' || xml[s - 1] === '\t')) s--;
   let e = o.end;
   while (e < xml.length && (xml[e] === ' ' || xml[e] === '\t')) e++;
-  const atLineStart = s === 0 || xml[s - 1] === '\n' || (s === 1 && xml[0] === '﻿');
+  const atLineStart = s === 0 || xml[s - 1] === '\n' || (s === 1 && xml[0] === '\uFEFF');
   const eolLen = xml.startsWith('\r\n', e) ? 2 : xml[e] === '\n' ? 1 : e === xml.length ? 0 : -1;
   if (atLineStart && eolLen >= 0) return { start: s, end: e + eolLen };
   // Inline element: drop it with its leading whitespace, unless that whitespace is the line's indent.
@@ -117,10 +135,11 @@ function plan(xml: string, scan: CsprojScan, ops: Op[]): Plan {
     }
     const info = originOf(scan, op.name);
     if (op.kind === 'remove') {
-      if (info.origin !== 'project') continue;
-      const r = removalRange(xml, info.last!);
-      touched.add(info.last!);
-      splices.push({ ...r, text: '', seq: seq++ });
+      for (const o of scan.occurrences) {
+        if (o.name !== op.name || o.conditional) continue;
+        touched.add(o);
+        splices.push({ ...removalRange(xml, o), text: '', seq: seq++ });
+      }
       continue;
     }
     if (info.origin === 'conditional') {
@@ -200,11 +219,25 @@ function verify(original: string, before: CsprojScan, out: string, ops: Op[], p:
   }
 }
 
+/**
+ * Throws 'postcondition' if two splices overlap. Zero-width inserts may touch a range's
+ * boundary or each other, but not sit strictly inside a replaced range. Exported for tests.
+ */
+export function checkDisjoint(splices: ReadonlyArray<{ start: number; end: number }>): void {
+  const sorted = [...splices].sort((a, b) => a.start - b.start || (a.end - a.start) - (b.end - b.start));
+  for (let i = 1; i < sorted.length; i++) {
+    if (sorted[i].start < sorted[i - 1].end) {
+      throw new PropertyEditError('postcondition', 'Internal error: overlapping edits');
+    }
+  }
+}
+
 export function applyPropertyEdits(xml: string, edits: PropertyEdit[]): string {
   const scan = scanCsproj(xml);
   const ops = normalize(scan, edits);
   const p = plan(xml, scan, ops);
   if (p.splices.length === 0) return xml;
+  checkDisjoint(p.splices);
   const ordered = [...p.splices].sort((a, b) => b.start - a.start || b.seq - a.seq);
   let out = xml;
   for (const s of ordered) out = out.slice(0, s.start) + s.text + out.slice(s.end);

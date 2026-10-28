@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { applyPropertyEdits, PropertyEditError } from '../../../src/properties/csprojEdit';
+import { applyPropertyEdits, checkDisjoint, PropertyEditError, type PropertyEdit } from '../../../src/properties/csprojEdit';
 import { scanCsproj, originOf } from '../../../src/properties/csprojScan';
 
 const FIX = join(__dirname, '../../fixtures/properties');
@@ -75,7 +75,7 @@ describe('applyPropertyEdits', () => {
   });
 
   it('set when no unconditional group creates one after <Project>', () => {
-    const xml = '﻿<Project Sdk="X">\r\n\t<PropertyGroup Condition="1==1">\r\n\t\t<A>1</A>\r\n\t</PropertyGroup>\r\n</Project>\r\n';
+    const xml = '\uFEFF<Project Sdk="X">\r\n\t<PropertyGroup Condition="1==1">\r\n\t\t<A>1</A>\r\n\t</PropertyGroup>\r\n</Project>\r\n';
     const s = scanCsproj(xml);
     const out = applyPropertyEdits(xml, [{ kind: 'set', name: 'B', value: '2' }]);
     expectSingleSplice(xml, out, s.projectOpenEnd, s.projectOpenEnd,
@@ -113,9 +113,25 @@ describe('applyPropertyEdits', () => {
       .toBe('<Project>\n  <PropertyGroup><A>1</A></PropertyGroup>\n</Project>\n');
   });
 
-  it('remove with an earlier unconditional duplicate fails the postcondition', () => {
-    const xml = '<Project>\n  <PropertyGroup>\n    <A>1</A>\n    <A>2</A>\n  </PropertyGroup>\n</Project>\n';
-    expect(codeOf(() => applyPropertyEdits(xml, [{ kind: 'remove', name: 'A' }]))).toBe('postcondition');
+  it('remove deletes every unconditional duplicate so the property goes back to inherited', () => {
+    const xml = '<Project>\n  <PropertyGroup>\n    <A>1</A>\n    <B>b</B>\n  </PropertyGroup>\n'
+      + '  <PropertyGroup Condition="1==1">\n    <A>c</A>\n  </PropertyGroup>\n'
+      + '  <PropertyGroup>\n    <A>2</A>\n  </PropertyGroup>\n</Project>\n';
+    const out = applyPropertyEdits(xml, [{ kind: 'remove', name: 'A' }]);
+    expect(out).toBe('<Project>\n  <PropertyGroup>\n    <B>b</B>\n  </PropertyGroup>\n'
+      + '  <PropertyGroup Condition="1==1">\n    <A>c</A>\n  </PropertyGroup>\n'
+      + '  <PropertyGroup>\n  </PropertyGroup>\n</Project>\n');
+    expect(originOf(scanCsproj(out), 'A').origin).toBe('conditional');
+    const plain = '<Project>\n  <PropertyGroup>\n    <A>1</A>\n    <A>2</A>\n  </PropertyGroup>\n</Project>\n';
+    const out2 = applyPropertyEdits(plain, [{ kind: 'remove', name: 'A' }]);
+    expect(out2).toBe('<Project>\n  <PropertyGroup>\n  </PropertyGroup>\n</Project>\n');
+    expect(originOf(scanCsproj(out2), 'A').origin).toBe('inherited');
+  });
+
+  it('remove next to a same-line comment keeps the comment (extra space accepted)', () => {
+    const xml = '<Project>\n  <PropertyGroup>\n    <A>1</A> <!-- c -->\n  </PropertyGroup>\n</Project>\n';
+    expect(applyPropertyEdits(xml, [{ kind: 'remove', name: 'A' }]))
+      .toBe('<Project>\n  <PropertyGroup>\n     <!-- c -->\n  </PropertyGroup>\n</Project>\n');
   });
 
   it('targetFrameworks with 2 tfms replaces TargetFramework by TargetFrameworks', () => {
@@ -146,8 +162,58 @@ describe('applyPropertyEdits', () => {
       .toBe('<Project>\n  <PropertyGroup>\n    <TargetFramework>net9.0</TargetFramework>\n  </PropertyGroup>\n</Project>\n');
   });
 
-  it('targetFrameworks rejects an empty list', () => {
-    expect(codeOf(() => applyPropertyEdits(webapi, [{ kind: 'targetFrameworks', tfms: [] }]))).toBe('invalidName');
+  it('targetFrameworks rejects an empty list or a TFM with a newline', () => {
+    expect(codeOf(() => applyPropertyEdits(webapi, [{ kind: 'targetFrameworks', tfms: [] }]))).toBe('invalidValue');
+    expect(codeOf(() => applyPropertyEdits(webapi, [{ kind: 'targetFrameworks', tfms: ['net8.0', 'net9.0\n'] }]))).toBe('invalidValue');
+  });
+
+  it('targetFrameworks cannot be combined with a plain TargetFramework(s) edit, in either order', () => {
+    const tf: PropertyEdit = { kind: 'targetFrameworks', tfms: ['net8.0', 'net10.0'] };
+    const others: PropertyEdit[] = [
+      { kind: 'set', name: 'TargetFrameworks', value: 'q;r' },
+      { kind: 'set', name: 'TargetFramework', value: 'net8.0' },
+      { kind: 'remove', name: 'TargetFramework' },
+      { kind: 'remove', name: 'TargetFrameworks' },
+      { kind: 'targetFrameworks', tfms: ['net9.0'] },
+    ];
+    for (const other of others) {
+      expect(codeOf(() => applyPropertyEdits(webapi, [tf, other]))).toBe('invalidName');
+      expect(codeOf(() => applyPropertyEdits(webapi, [other, tf]))).toBe('invalidName');
+    }
+    expect(applyPropertyEdits(webapi, [tf, { kind: 'set', name: 'Nullable', value: 'disable' }]))
+      .toBe(webapi.replace('<TargetFramework>net10.0</TargetFramework>', '<TargetFrameworks>net8.0;net10.0</TargetFrameworks>')
+        .replace('<Nullable>enable<', '<Nullable>disable<'));
+  });
+
+  it('rejects values with CR, LF or XML-illegal control characters, allows TAB', () => {
+    for (const value of ['a\nb', 'a\r\nb', 'a\rb', '\u0000', '\u0001', '\u001F']) {
+      expect(codeOf(() => applyPropertyEdits(webapi, [{ kind: 'set', name: 'Nullable', value }]))).toBe('invalidValue');
+    }
+    const out = applyPropertyEdits(webapi, [{ kind: 'set', name: 'Nullable', value: 'a\tb' }]);
+    expect(out).toBe(webapi.replace('<Nullable>enable<', '<Nullable>a\tb<'));
+  });
+
+  it('keeps $(Prop) references literally', () => {
+    const out = applyPropertyEdits(webapi, [{ kind: 'set', name: 'Product', value: '$(AssemblyName);$(Foo)' }]);
+    expect(out).toContain('    <Product>$(AssemblyName);$(Foo)</Product>\n');
+    expect(originOf(scanCsproj(out), 'Product').last!.value).toBe('$(AssemblyName);$(Foo)');
+  });
+
+  it('an existing &amp; round-trips through scan and set', () => {
+    const company = originOf(scanCsproj(handmade), 'Company').last!;
+    expect(company.value).toBe('Smith & Sons');
+    expect(applyPropertyEdits(handmade, [{ kind: 'set', name: 'Company', value: company.value }])).toBe(handmade);
+    const literal = applyPropertyEdits(handmade, [{ kind: 'set', name: 'Company', value: 'X &amp; Y' }]);
+    expect(literal).toBe(handmade.replace('Smith &amp; Sons', 'X &amp;amp; Y'));
+    expect(originOf(scanCsproj(literal), 'Company').last!.value).toBe('X &amp; Y');
+  });
+
+  it('checkDisjoint throws postcondition on overlapping splices', () => {
+    const code = (s: { start: number; end: number }[]) => codeOf(() => checkDisjoint(s));
+    expect(code([{ start: 0, end: 5 }, { start: 4, end: 8 }])).toBe('postcondition');
+    expect(code([{ start: 2, end: 4 }, { start: 0, end: 10 }])).toBe('postcondition');
+    expect(code([{ start: 0, end: 5 }, { start: 3, end: 3 }])).toBe('postcondition');
+    expect(code([{ start: 0, end: 5 }, { start: 5, end: 5 }, { start: 5, end: 9 }, { start: 0, end: 0 }, { start: 9, end: 9 }])).toBeUndefined();
   });
 
   it('escapes & < >', () => {
