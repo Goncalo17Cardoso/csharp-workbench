@@ -238,4 +238,13 @@ describe('Solution Explorer end to end', function () {
     assert.strictEqual((await slnProjects()).length, 3, 'all projects are still listed');
     assert.deepStrictEqual(await names(), ['src', 'tests', 'web']);
   });
+
+  it('menu-style args (node, [node]) show the UI instead of being taken as answers', async () => {
+    const root = await must('solution', (n) => n.kind === 'solution');
+    const pending = run('newSolutionFolder', root, [root]);
+    await sleep(1500);
+    await vscode.commands.executeCommand('workbench.action.closeQuickOpen'); // dismisses the input box
+    await pending;
+    assert.deepStrictEqual((await model()).folders.map((f) => f.name).sort(), ['src', 'tests', 'web']);
+  });
 });

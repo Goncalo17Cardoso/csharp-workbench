@@ -3,6 +3,7 @@ import * as path from 'node:path';
 import * as vscode from 'vscode';
 import type { DotnetCli } from '../../dotnet/cli';
 import { confirmAction } from '../confirm';
+import { presetString } from '../presets';
 import type { CodeKind } from '../codeTemplates';
 import type { ProjectInfoData, TreeNode } from '../model';
 import { namespaceFor } from '../naming';
@@ -119,9 +120,10 @@ export function registerFileCommands(deps: Deps): vscode.Disposable[] {
   }
 
   /** `shortName` and `name` let the Test-mode API answer the prompts programmatically. */
-  async function newItem(node?: TreeNode, shortName?: string, name?: string): Promise<void> {
+  async function newItem(node?: TreeNode, shortNameArg?: unknown, nameArg?: unknown): Promise<void> {
     if (!node) return;
-    if (typeof shortName === 'string') { await addFromCatalog(node, shortName, name); return; }
+    const shortName = presetString(shortNameArg);
+    if (shortName !== undefined) { await addFromCatalog(node, shortName, presetString(nameArg)); return; }
     const cli = await deps.getCli();
     const qp = vscode.window.createQuickPick<vscode.QuickPickItem & { choice?: ReturnType<typeof newItemChoices>[number] }>();
     qp.placeholder = vscode.l10n.t('Select an item template');
@@ -228,7 +230,7 @@ export function registerFileCommands(deps: Deps): vscode.Disposable[] {
   const reg = (id: string, fn: (...a: never[]) => unknown) => vscode.commands.registerCommand(`csharpWorkbench.${id}`, fn as (...a: unknown[]) => unknown);
   return [
     reg('newItem', newItem),
-    reg('newClass', (n?: TreeNode, name?: string) => n && addBuiltIn(n, 'class', typeof name === 'string' ? name : undefined)),
+    reg('newClass', (n?: TreeNode, name?: unknown) => n && addBuiltIn(n, 'class', presetString(name))),
     reg('newInterface', (n?: TreeNode) => n && addBuiltIn(n, 'interface')),
     reg('newFolder', newFolder),
     reg('addExistingItem', addExisting),

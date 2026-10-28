@@ -70,20 +70,15 @@ export async function createSolutionExplorerFixture(
   const sln = path.join(dir, 'MySln.sln');
 
   const apiDir = path.join(dir, 'src', 'web', 'My App #1');
-  const apiTemplate = await dotnet(dn, ['new', 'webapi', '-n', 'MyApp.Api', '-o', apiDir, '-f', 'net8.0'], dir).then(() => 'webapi')
-    .catch(async () => { await dotnet(dn, ['new', 'web', '-n', 'MyApp.Api', '-o', apiDir, '-f', 'net8.0'], dir); return 'web'; });
+  const apiTemplate = await dotnet(dn, ['new', 'webapi', '-n', 'MyApp.Api', '-o', apiDir, '-f', 'net8.0'], dir).then(() => 'webapi'); // no fallback: SDK 8 ships webapi, and a substitute could make the nesting test vacuous
   const api = path.join(apiDir, 'MyApp.Api.csproj');
-  const devSettings = path.join(apiDir, 'appsettings.Development.json');
-  if (!(await fs.access(devSettings).then(() => true, () => false))) await fs.writeFile(devSettings, '{}\n');
-  if (!(await fs.access(path.join(apiDir, 'appsettings.json')).then(() => true, () => false))) await fs.writeFile(path.join(apiDir, 'appsettings.json'), '{}\n');
 
   await dotnet(dn, ['new', 'classlib', '-n', 'MyApp.Core', '-o', path.join(dir, 'MyApp.Core'), '-f', 'net8.0'], dir);
   const core = path.join(dir, 'MyApp.Core', 'MyApp.Core.csproj');
   await fs.mkdir(path.join(dir, 'MyApp.Core', 'Models'), { recursive: true });
   await fs.writeFile(path.join(dir, 'MyApp.Core', 'Models', 'Address.cs'), 'namespace MyApp.Core.Models;\n\npublic class Address { }\n');
 
-  const testsTemplate = await dotnet(dn, ['new', 'xunit', '-n', 'MyApp.Tests', '-o', path.join(dir, 'tests', 'MyApp.Tests'), '-f', 'net8.0'], dir).then(() => 'xunit')
-    .catch(async () => { await dotnet(dn, ['new', 'classlib', '-n', 'MyApp.Tests', '-o', path.join(dir, 'tests', 'MyApp.Tests'), '-f', 'net8.0'], dir); return 'classlib'; });
+  const testsTemplate = await dotnet(dn, ['new', 'xunit', '-n', 'MyApp.Tests', '-o', path.join(dir, 'tests', 'MyApp.Tests'), '-f', 'net8.0'], dir).then(() => 'xunit');
   const tests = path.join(dir, 'tests', 'MyApp.Tests', 'MyApp.Tests.csproj');
 
   await dotnet(dn, ['sln', sln, 'add', '--solution-folder', 'src/web', api], dir);

@@ -9,6 +9,7 @@ import {
   dependentsOf, executePlan, folderPathOf, locateCsproj, planRemoveFolder, planRenameProject, referenceCandidates,
   solutionFolderId, validateProjectName, type Step,
 } from '../plans';
+import { presetPaths, presetString } from '../presets';
 import { removeFolderFlow } from '../removeFolder';
 import { readProjectInfo } from '../projectInfo';
 import { addFolder, removeEmptyFolder, renameFolder, validateFolderName } from '../slnFolders';
@@ -82,15 +83,17 @@ export function registerSolutionCommands(deps: Deps): vscode.Disposable[] {
 
   // ---- projects -----------------------------------------------------------------------------
 
-  async function addNewProject(node?: TreeNode, presetShort?: string, presetName?: string): Promise<void> {
+  async function addNewProject(node?: TreeNode, presetShortArg?: unknown, presetNameArg?: unknown): Promise<void> {
     const ctx = await need();
     if (!ctx || !node) return;
     const { cli, sln } = ctx;
+    const presetShort = presetString(presetShortArg);
+    const presetName = presetString(presetNameArg);
     const solDir = path.dirname(sln);
     catalog ??= new TemplateCatalog(cli);
     let list;
     try { list = await catalog.list('project'); } catch (e) { deps.showOutput(); fail(e); return; }
-    const pick = typeof presetShort === 'string' ? { shortName: presetShort } : await vscode.window.showQuickPick(
+    const pick = presetShort !== undefined ? { shortName: presetShort } : await vscode.window.showQuickPick(
       list.filter((t) => t.languages.length === 0 || t.languages.includes('C#'))
         .map((t) => ({ label: t.name, description: t.shortNames.join(', '), shortName: t.shortNames[0] }))
         .filter((t) => t.shortName),
@@ -188,14 +191,14 @@ export function registerSolutionCommands(deps: Deps): vscode.Disposable[] {
 
   // ---- solution folders ---------------------------------------------------------------------
 
-  async function newSolutionFolder(node?: TreeNode, presetName?: string): Promise<void> {
+  async function newSolutionFolder(node?: TreeNode, presetNameArg?: unknown): Promise<void> {
     const ctx = await need();
     if (!ctx || !node) return;
     let model: SolutionModel;
     try { model = await loadSolution(ctx.sln, readText); } catch (e) { fail(e); return; }
     const parentId = node.kind === 'solutionFolder' ? folderIdOf(ctx.sln, node) : undefined;
     const siblings = model.folders.filter((f) => f.parentId === parentId).map((f) => f.name);
-    const name = presetName ?? await vscode.window.showInputBox({
+    const name = presetString(presetNameArg) ?? await vscode.window.showInputBox({
       prompt: vscode.l10n.t('Solution folder name'), validateInput: (v) => validateFolderName(v, siblings) && vscode.l10n.t('Enter a unique name without any of: / \\ : * ? " < > |'),
     });
     if (!name) return;
@@ -204,7 +207,7 @@ export function registerSolutionCommands(deps: Deps): vscode.Disposable[] {
     } catch (e) { fail(e); } finally { reload(); }
   }
 
-  async function renameSolutionFolder(node?: TreeNode, presetName?: string): Promise<void> {
+  async function renameSolutionFolder(node?: TreeNode, presetNameArg?: unknown): Promise<void> {
     const ctx = await need();
     if (!ctx || node?.kind !== 'solutionFolder') return;
     let model: SolutionModel;
@@ -212,7 +215,7 @@ export function registerSolutionCommands(deps: Deps): vscode.Disposable[] {
     const id = folderIdOf(ctx.sln, node);
     const parentId = model.folders.find((f) => f.id === id)?.parentId;
     const siblings = model.folders.filter((f) => f.parentId === parentId && f.id !== id).map((f) => f.name);
-    const name = presetName ?? await vscode.window.showInputBox({
+    const name = presetString(presetNameArg) ?? await vscode.window.showInputBox({
       value: node.label, prompt: vscode.l10n.t('Solution folder name'),
       validateInput: (v) => validateFolderName(v, siblings) && vscode.l10n.t('Enter a unique name without any of: / \\ : * ? " < > |'),
     });
@@ -249,7 +252,7 @@ export function registerSolutionCommands(deps: Deps): vscode.Disposable[] {
 
   // ---- references ---------------------------------------------------------------------------
 
-  async function addProjectReference(node?: TreeNode, presetPaths?: string[]): Promise<void> {
+  async function addProjectReference(node?: TreeNode, presetPathsArg?: unknown): Promise<void> {
     const ctx = await need();
     const target = node?.projectPath;
     if (!ctx || !target) return;
@@ -257,7 +260,7 @@ export function registerSolutionCommands(deps: Deps): vscode.Disposable[] {
       const model = await loadSolution(ctx.sln, readText);
       const cands = referenceCandidates(model.projects, await infosOf(model), target);
       if (cands.length === 0) { void vscode.window.showInformationMessage(vscode.l10n.t('No other projects can be referenced.')); return; }
-      const picks = Array.isArray(presetPaths) ? presetPaths.map((p) => ({ path: p })) : await vscode.window.showQuickPick(
+      const picks = presetPaths(presetPathsArg) ? presetPaths(presetPathsArg)!.map((p) => ({ path: p })) : await vscode.window.showQuickPick(
         cands.map((p) => ({ label: p.name, description: vscode.workspace.asRelativePath(p.path), path: p.path })),
         { canPickMany: true, placeHolder: vscode.l10n.t('Select projects to reference') },
       );

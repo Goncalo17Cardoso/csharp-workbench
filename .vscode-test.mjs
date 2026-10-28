@@ -1,8 +1,10 @@
 import { mkdirSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { defineConfig } from '@vscode/test-cli';
 
 // The Solution Explorer e2e tests build their fixtures inside this workspace folder (kept short and '#'-free).
-const workspaceFolder = '/tmp/cswws';
+const workspaceFolder = join(tmpdir(), 'cswws');
 mkdirSync(workspaceFolder, { recursive: true });
 
 export default defineConfig({
