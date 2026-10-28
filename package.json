@@ -342,7 +342,7 @@
       "view/item/context": [
         {
           "submenu": "csharpWorkbench.add",
-          "when": "viewItem =~ /^cw\\.(project|folder|solution)/",
+          "when": "viewItem =~ /^cw\\.(project(\\.|$)|folder|solution)/",
           "group": "2_add"
         },
         {
@@ -362,22 +362,22 @@
         },
         {
           "command": "csharpWorkbench.paste",
-          "when": "viewItem =~ /^cw\\.(project|folder)/",
+          "when": "viewItem =~ /^cw\\.(project(\\.|$)|folder)/",
           "group": "6_edit@4"
         },
         {
           "command": "csharpWorkbench.copyPath",
-          "when": "viewItem =~ /^cw\\.(file|folder|project)/",
+          "when": "viewItem =~ /^cw\\.(file|folder|project(\\.|$))/",
           "group": "6_edit@5"
         },
         {
           "command": "csharpWorkbench.revealInFinder",
-          "when": "viewItem =~ /^cw\\.(file|folder|project)/",
+          "when": "viewItem =~ /^cw\\.(file|folder|project(\\.|$))/",
           "group": "5_os@1"
         },
         {
           "command": "csharpWorkbench.openInTerminal",
-          "when": "viewItem =~ /^cw\\.(file|folder|project)/",
+          "when": "viewItem =~ /^cw\\.(file|folder|project(\\.|$))/",
           "group": "5_os@2"
         },
         {
@@ -444,27 +444,27 @@
       "csharpWorkbench.add": [
         {
           "command": "csharpWorkbench.newItem",
-          "when": "viewItem =~ /^cw\\.(project|folder)/",
+          "when": "viewItem =~ /^cw\\.(project(\\.|$)|folder)/",
           "group": "1_add@1"
         },
         {
           "command": "csharpWorkbench.newClass",
-          "when": "viewItem =~ /^cw\\.(project|folder)/",
+          "when": "viewItem =~ /^cw\\.(project(\\.|$)|folder)/",
           "group": "1_add@2"
         },
         {
           "command": "csharpWorkbench.newInterface",
-          "when": "viewItem =~ /^cw\\.(project|folder)/",
+          "when": "viewItem =~ /^cw\\.(project(\\.|$)|folder)/",
           "group": "1_add@3"
         },
         {
           "command": "csharpWorkbench.newFolder",
-          "when": "viewItem =~ /^cw\\.(project|folder)/",
+          "when": "viewItem =~ /^cw\\.(project(\\.|$)|folder)/",
           "group": "1_add@4"
         },
         {
           "command": "csharpWorkbench.addExistingItem",
-          "when": "viewItem =~ /^cw\\.(project|folder)/",
+          "when": "viewItem =~ /^cw\\.(project(\\.|$)|folder)/",
           "group": "1_add@5"
         },
         {

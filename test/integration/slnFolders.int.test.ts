@@ -9,6 +9,7 @@ import { nodeExec } from '../../src/dotnet/exec';
 import { findDotnet } from '../../src/dotnet/locate';
 import { createOutput } from '../../src/output';
 import { addFolder, removeEmptyFolder, renameFolder } from '../../src/solution/slnFolders';
+import { removeFolderFlow } from '../../src/solution/removeFolder';
 import { loadSolution } from '../../src/solution/slnParse';
 import { nodeSolutionFs, writeSolutionAtomically } from '../../src/solution/slnWriter';
 
@@ -100,6 +101,40 @@ describe.skipIf(!dotnet)('solution-folder edits validated by the dotnet CLI', ()
       }, beforeText)).rejects.toThrow(/dotnet sln failed/);
       expect(await fs.readFile(sln)).toEqual(before);
       expect((await fs.readdir(root)).filter((f) => /\.cw-(tmp|bak)$/.test(f))).toEqual([]);
+    }, T);
+  }
+});
+
+describe.skipIf(!dotnet)('removeFolderFlow after dotnet sln remove empties folders', () => {
+  for (const kind of ['sln', 'slnx'] as const) {
+    it(`${kind}: removing src with a project in src/web leaves no src folder`, async () => {
+      process.env.DOTNET_ROOT ??= path.join(home, '.dotnet');
+      const root = await fs.mkdtemp(path.join(os.tmpdir(), 'cw-rm-'));
+      try {
+        const cli = new DotnetCli(nodeExec, dotnet!, createOutput({ appendLine: () => {} }));
+        await run(['new', 'classlib', '-n', 'Lib', '-o', 'Lib', '-f', 'net8.0'], root);
+        await run(['new', 'sln', '--format', kind, '-n', 'App'], root);
+        const sln = path.join(root, `App.${kind}`);
+        const proj = path.join(root, 'Lib', 'Lib.csproj');
+        const edit = async (change: (t: string, k: 'sln' | 'slnx') => string) => {
+          const original = await nodeSolutionFs.readFile(sln);
+          await writeSolutionAtomically(sln, change(original, kind), {
+            ...nodeSolutionFs, validate: async () => { await cli.slnList(sln); },
+          }, original);
+        };
+        await cli.slnAdd(sln, proj, 'src/web');
+        const before = await loadSolution(sln, nodeSolutionFs.readFile);
+        const src = before.folders.find((f) => f.name === 'src')!;
+        await removeFolderFlow(src.id, {
+          slnRemove: (p) => cli.slnRemove(sln, p),
+          load: () => loadSolution(sln, nodeSolutionFs.readFile),
+          edit,
+        });
+        const after = await loadSolution(sln, nodeSolutionFs.readFile);
+        expect(after.folders.some((f) => f.name === 'src' || f.name === 'web')).toBe(false);
+        expect(after.projects).toEqual([]);
+        await expect(cli.slnList(sln)).resolves.toBeDefined();
+      } finally { await fs.rm(root, { recursive: true, force: true }); }
     }, T);
   }
 });

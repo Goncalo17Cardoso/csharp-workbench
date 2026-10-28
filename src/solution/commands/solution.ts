@@ -9,6 +9,7 @@ import {
   dependentsOf, executePlan, folderPathOf, locateCsproj, planRemoveFolder, planRenameProject, referenceCandidates,
   solutionFolderId, validateProjectName, type Step,
 } from '../plans';
+import { removeFolderFlow } from '../removeFolder';
 import { readProjectInfo } from '../projectInfo';
 import { addFolder, removeEmptyFolder, renameFolder, validateFolderName } from '../slnFolders';
 import { loadSolution } from '../slnParse';
@@ -176,7 +177,8 @@ export function registerSolutionCommands(deps: Deps): vscode.Disposable[] {
       const res = await executePlan(steps, run);
       if (res.failedAt !== undefined) {
         deps.showOutput();
-        fail(new Error(vscode.l10n.t('Rename failed at step {0} of {1}: {2}', res.failedAt + 1, steps.length, errText(res.error))));
+        const failed = steps[res.failedAt];
+        fail(new Error(`${vscode.l10n.t('Rename failed at step {0} of {1} ({2} {3}): {4}', res.failedAt + 1, steps.length, failed.op, path.basename(failed.args[0]), errText(res.error))} ${vscode.l10n.t('The solution may be partially updated; check it and re-add the project if needed.')}`));
       }
     } catch (e) { deps.showOutput(); fail(e); } finally {
       if (!(await exists(old)) && await exists(neu)) await moveStartupProject(ws, ctx.sln, old, neu);
@@ -237,11 +239,11 @@ export function registerSolutionCommands(deps: Deps): vscode.Disposable[] {
       if (!ok) return;
       const removed: string[] = [];
       try {
-        for (const p of plan.projectRemovals) { await cli.slnRemove(sln, p); removed.push(p); }
+        await removeFolderFlow(id, {
+          slnRemove: (p) => cli.slnRemove(sln, p), load: () => loadSolution(sln, readText),
+          edit: (change) => editSolution(cli, sln, change), onProjectRemoved: (p) => removed.push(p),
+        });
       } finally { await clearStartupIfRemoved(ws, sln, removed); }
-      for (const fid of plan.folderIdsBottomUp) {
-        await editSolution(cli, sln, (t, kind) => removeEmptyFolder(t, kind, fid));
-      }
     } catch (e) { deps.showOutput(); fail(e); } finally { reload(); }
   }
 
