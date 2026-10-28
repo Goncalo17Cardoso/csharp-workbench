@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { DotnetCli } from '../../../src/dotnet/cli';
 import type { Exec } from '../../../src/dotnet/exec';
-import { debugConfigFor, dotnetTask, runTfm, targetPathStep } from '../../../src/solution/runCore';
+import { createEndWaiter, debugConfigFor, dotnetTask, runTfm, targetPathStep } from '../../../src/solution/runCore';
 
 describe('dotnetTask', () => {
   it('build', () => expect(dotnetTask('build', '/s/Api/MyApp.Api.csproj', 'dotnet'))
@@ -46,5 +46,36 @@ describe('run on multi-target', () => {
     expect(runTfm(['net8.0'])).toBeUndefined();
     expect(runTfm([])).toBeUndefined();
     expect(runTfm(['net8.0', 'net9.0'])).toBe('net8.0');
+  });
+});
+
+describe('createEndWaiter', () => {
+  const mk = () => {
+    vi.useFakeTimers();
+    return createEndWaiter<string>((fn, ms) => setTimeout(fn, ms), (t) => clearTimeout(t as never), 500);
+  };
+  const settle = async (w: ReturnType<typeof mk>) => { await vi.advanceTimersByTimeAsync(600); return w.promise; };
+  it('process then task -> code', async () => {
+    const w = mk(); w.setExecution('a'); w.onProcessEnd('a', 0); w.onTaskEnd('a');
+    expect(await settle(w)).toBe(0); vi.useRealTimers();
+  });
+  it('task then process within grace -> code', async () => {
+    const w = mk(); w.setExecution('a'); w.onTaskEnd('a');
+    await vi.advanceTimersByTimeAsync(200); w.onProcessEnd('a', 3);
+    expect(await settle(w)).toBe(3); vi.useRealTimers();
+  });
+  it('task only -> undefined after grace', async () => {
+    const w = mk(); w.setExecution('a'); w.onTaskEnd('a');
+    let v: number | undefined | 'pending' = 'pending'; void w.promise.then((x) => { v = x; });
+    await vi.advanceTimersByTimeAsync(400); expect(v).toBe('pending');
+    await vi.advanceTimersByTimeAsync(200); expect(v).toBeUndefined(); vi.useRealTimers();
+  });
+  it('early buffered process and task -> prefers process code', async () => {
+    const w = mk(); w.onTaskEnd('a'); w.onProcessEnd('a', 0); w.setExecution('a');
+    expect(await settle(w)).toBe(0); vi.useRealTimers();
+  });
+  it('ignores other executions', async () => {
+    const w = mk(); w.setExecution('a'); w.onProcessEnd('b', 1); w.onTaskEnd('b'); w.onProcessEnd('a', 0);
+    expect(await settle(w)).toBe(0); vi.useRealTimers();
   });
 });

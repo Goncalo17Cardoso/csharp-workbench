@@ -4,7 +4,7 @@ import * as vscode from 'vscode';
 import type { DotnetCli } from '../../dotnet/cli';
 import type { TreeNode } from '../model';
 import { readProjectInfo } from '../projectInfo';
-import { debugConfigFor, dotnetTask, runTfm, targetPathStep, type TaskKind } from '../runCore';
+import { createEndWaiter, debugConfigFor, dotnetTask, runTfm, targetPathStep, type TaskKind } from '../runCore';
 import { loadSolution } from '../slnParse';
 import type { SolutionTreeProvider } from '../SolutionTreeProvider';
 import { getStartupProject, setStartupProject } from '../state';
@@ -39,22 +39,13 @@ export function registerRunCommands(deps: Deps): vscode.Disposable[] {
     );
     if (kind !== 'run') task.group = vscode.TaskGroup.Build;
     if (!wait) { await vscode.tasks.executeTask(task); return 0; }
-    let exec: vscode.TaskExecution | undefined;
-    const early: Array<{ execution: vscode.TaskExecution; exitCode: number | undefined }> = [];
-    let done: (code: number | undefined) => void = () => undefined;
-    const result = new Promise<number | undefined>((r) => { done = r; });
-    // Whichever of process-end / task-end fires first wins; a task that ends without a process resolves undefined.
-    const onEnd = (execution: vscode.TaskExecution, exitCode: number | undefined) => {
-      if (!exec) early.push({ execution, exitCode }); else if (execution === exec) done(exitCode);
-    };
-    const sub1 = vscode.tasks.onDidEndTaskProcess((e) => onEnd(e.execution, e.exitCode));
-    const sub2 = vscode.tasks.onDidEndTask((e) => onEnd(e.execution, undefined));
-    const sub = { dispose: () => { sub1.dispose(); sub2.dispose(); } };
+    const waiter = createEndWaiter<vscode.TaskExecution>((fn, ms) => setTimeout(fn, ms), (t) => clearTimeout(t as NodeJS.Timeout), 500);
+    const sub1 = vscode.tasks.onDidEndTaskProcess((e) => waiter.onProcessEnd(e.execution, e.exitCode));
+    const sub2 = vscode.tasks.onDidEndTask((e) => waiter.onTaskEnd(e.execution));
+    const sub = { dispose: () => { sub1.dispose(); sub2.dispose(); waiter.dispose(); } };
     try {
-      exec = await vscode.tasks.executeTask(task);
-      const hit = early.find((e) => e.execution === exec);
-      if (hit) done(hit.exitCode);
-      return await result;
+      waiter.setExecution(await vscode.tasks.executeTask(task));
+      return await waiter.promise;
     } finally { sub.dispose(); }
   }
 
