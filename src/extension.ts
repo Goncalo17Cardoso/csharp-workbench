@@ -11,6 +11,7 @@ import { createOutput } from './output';
 import { PanelManager, type PanelTestHooks } from './panel/PanelManager';
 import type { ToHost } from './panel/protocol';
 import { registerFileCommands } from './solution/commands/fileCommands';
+import { registerSolutionCommands } from './solution/commands/solution';
 import { setConfirmOverride } from './solution/confirm';
 import { SolutionTreeProvider } from './solution/SolutionTreeProvider';
 import { selectTargets } from './workspace/targets';
@@ -135,6 +136,12 @@ export function activate(context: vscode.ExtensionContext): ExtensionApi | undef
   setConfirmOverride(() => api?.confirmOverride);
   context.subscriptions.push(...registerFileCommands({
     provider: explorer,
+    getCli: async () => { const d = await resolveDotnet(); return d ? new DotnetCli(nodeExec, d, output) : undefined; },
+    showOutput: () => channel.show(true),
+  }));
+  context.subscriptions.push(...registerSolutionCommands({
+    provider: explorer,
+    ws: context.workspaceState,
     getCli: async () => { const d = await resolveDotnet(); return d ? new DotnetCli(nodeExec, d, output) : undefined; },
     showOutput: () => channel.show(true),
   }));

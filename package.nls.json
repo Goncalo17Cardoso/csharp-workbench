@@ -19,5 +19,19 @@
   "command.copyPath.title": "Copy Path",
   "command.revealInFinder.title": "Reveal in Finder",
   "command.openInTerminal.title": "Open in Terminal",
-  "submenu.add.label": "Add"
+  "submenu.add.label": "Add",
+  "command.addNewProject.title": "New Project…",
+  "command.addExistingProject.title": "Existing Project…",
+  "command.newSolutionFolder.title": "New Solution Folder",
+  "command.renameSolutionFolder.title": "Rename",
+  "command.removeSolutionFolder.title": "Remove",
+  "command.removeFromSolution.title": "Remove from Solution",
+  "command.renameProject.title": "Rename",
+  "command.addProjectReference.title": "Project Reference…",
+  "command.removeProjectReference.title": "Remove",
+  "command.manageNugetForProject.title": "Manage NuGet Packages…",
+  "command.manageNugetForSolution.title": "Manage NuGet Packages for Solution…",
+  "command.addNugetPackage.title": "NuGet Package…",
+  "command.updatePackage.title": "Update Package…",
+  "command.removePackage.title": "Remove"
 }

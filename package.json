@@ -128,6 +128,76 @@
         "command": "csharpWorkbench.openInTerminal",
         "title": "%command.openInTerminal.title%",
         "category": "C# Workbench"
+      },
+      {
+        "command": "csharpWorkbench.addNewProject",
+        "title": "%command.addNewProject.title%",
+        "category": "C# Workbench"
+      },
+      {
+        "command": "csharpWorkbench.addExistingProject",
+        "title": "%command.addExistingProject.title%",
+        "category": "C# Workbench"
+      },
+      {
+        "command": "csharpWorkbench.newSolutionFolder",
+        "title": "%command.newSolutionFolder.title%",
+        "category": "C# Workbench"
+      },
+      {
+        "command": "csharpWorkbench.renameSolutionFolder",
+        "title": "%command.renameSolutionFolder.title%",
+        "category": "C# Workbench"
+      },
+      {
+        "command": "csharpWorkbench.removeSolutionFolder",
+        "title": "%command.removeSolutionFolder.title%",
+        "category": "C# Workbench"
+      },
+      {
+        "command": "csharpWorkbench.removeFromSolution",
+        "title": "%command.removeFromSolution.title%",
+        "category": "C# Workbench"
+      },
+      {
+        "command": "csharpWorkbench.renameProject",
+        "title": "%command.renameProject.title%",
+        "category": "C# Workbench"
+      },
+      {
+        "command": "csharpWorkbench.addProjectReference",
+        "title": "%command.addProjectReference.title%",
+        "category": "C# Workbench"
+      },
+      {
+        "command": "csharpWorkbench.removeProjectReference",
+        "title": "%command.removeProjectReference.title%",
+        "category": "C# Workbench"
+      },
+      {
+        "command": "csharpWorkbench.manageNugetForProject",
+        "title": "%command.manageNugetForProject.title%",
+        "category": "C# Workbench"
+      },
+      {
+        "command": "csharpWorkbench.manageNugetForSolution",
+        "title": "%command.manageNugetForSolution.title%",
+        "category": "C# Workbench"
+      },
+      {
+        "command": "csharpWorkbench.addNugetPackage",
+        "title": "%command.addNugetPackage.title%",
+        "category": "C# Workbench"
+      },
+      {
+        "command": "csharpWorkbench.updatePackage",
+        "title": "%command.updatePackage.title%",
+        "category": "C# Workbench"
+      },
+      {
+        "command": "csharpWorkbench.removePackage",
+        "title": "%command.removePackage.title%",
+        "category": "C# Workbench"
       }
     ],
     "menus": {
@@ -189,6 +259,62 @@
         {
           "command": "csharpWorkbench.openInTerminal",
           "when": "false"
+        },
+        {
+          "command": "csharpWorkbench.addNewProject",
+          "when": "false"
+        },
+        {
+          "command": "csharpWorkbench.addExistingProject",
+          "when": "false"
+        },
+        {
+          "command": "csharpWorkbench.newSolutionFolder",
+          "when": "false"
+        },
+        {
+          "command": "csharpWorkbench.renameSolutionFolder",
+          "when": "false"
+        },
+        {
+          "command": "csharpWorkbench.removeSolutionFolder",
+          "when": "false"
+        },
+        {
+          "command": "csharpWorkbench.removeFromSolution",
+          "when": "false"
+        },
+        {
+          "command": "csharpWorkbench.renameProject",
+          "when": "false"
+        },
+        {
+          "command": "csharpWorkbench.addProjectReference",
+          "when": "false"
+        },
+        {
+          "command": "csharpWorkbench.removeProjectReference",
+          "when": "false"
+        },
+        {
+          "command": "csharpWorkbench.manageNugetForProject",
+          "when": "false"
+        },
+        {
+          "command": "csharpWorkbench.manageNugetForSolution",
+          "when": "false"
+        },
+        {
+          "command": "csharpWorkbench.addNugetPackage",
+          "when": "false"
+        },
+        {
+          "command": "csharpWorkbench.updatePackage",
+          "when": "false"
+        },
+        {
+          "command": "csharpWorkbench.removePackage",
+          "when": "false"
         }
       ],
       "view/title": [
@@ -216,7 +342,7 @@
       "view/item/context": [
         {
           "submenu": "csharpWorkbench.add",
-          "when": "viewItem =~ /^cw\\.(project|folder)/",
+          "when": "viewItem =~ /^cw\\.(project|folder|solution)/",
           "group": "2_add"
         },
         {
@@ -253,6 +379,66 @@
           "command": "csharpWorkbench.openInTerminal",
           "when": "viewItem =~ /^cw\\.(file|folder|project)/",
           "group": "5_os@2"
+        },
+        {
+          "command": "csharpWorkbench.manageNugetForSolution",
+          "when": "viewItem =~ /^cw\\.solution$/",
+          "group": "4_manage@1"
+        },
+        {
+          "command": "csharpWorkbench.manageNugetForProject",
+          "when": "viewItem =~ /^cw\\.project(\\.|$)/",
+          "group": "4_manage@1"
+        },
+        {
+          "command": "csharpWorkbench.manageNugetForProject",
+          "when": "viewItem =~ /^cw\\.packages$/",
+          "group": "4_manage@1"
+        },
+        {
+          "command": "csharpWorkbench.addNugetPackage",
+          "when": "viewItem =~ /^cw\\.packages$/",
+          "group": "4_manage@2"
+        },
+        {
+          "command": "csharpWorkbench.addProjectReference",
+          "when": "viewItem =~ /^cw\\.projectRefs$/",
+          "group": "4_manage@1"
+        },
+        {
+          "command": "csharpWorkbench.updatePackage",
+          "when": "viewItem =~ /^cw\\.package$/",
+          "group": "4_manage@1"
+        },
+        {
+          "command": "csharpWorkbench.removePackage",
+          "when": "viewItem =~ /^cw\\.package$/",
+          "group": "7_remove@1"
+        },
+        {
+          "command": "csharpWorkbench.removeProjectReference",
+          "when": "viewItem =~ /^cw\\.projectRef$/",
+          "group": "7_remove@1"
+        },
+        {
+          "command": "csharpWorkbench.renameProject",
+          "when": "viewItem =~ /^cw\\.project(\\.|$)/",
+          "group": "6_edit@0"
+        },
+        {
+          "command": "csharpWorkbench.removeFromSolution",
+          "when": "viewItem =~ /^cw\\.project(\\.|$)/",
+          "group": "7_remove@1"
+        },
+        {
+          "command": "csharpWorkbench.renameSolutionFolder",
+          "when": "viewItem =~ /^cw\\.solutionFolder$/",
+          "group": "6_edit@0"
+        },
+        {
+          "command": "csharpWorkbench.removeSolutionFolder",
+          "when": "viewItem =~ /^cw\\.solutionFolder$/",
+          "group": "7_remove@1"
         }
       ],
       "csharpWorkbench.add": [
@@ -280,6 +466,31 @@
           "command": "csharpWorkbench.addExistingItem",
           "when": "viewItem =~ /^cw\\.(project|folder)/",
           "group": "1_add@5"
+        },
+        {
+          "command": "csharpWorkbench.addNewProject",
+          "when": "viewItem =~ /^cw\\.solution(Folder)?$/",
+          "group": "0_project@1"
+        },
+        {
+          "command": "csharpWorkbench.addExistingProject",
+          "when": "viewItem =~ /^cw\\.solution(Folder)?$/",
+          "group": "0_project@2"
+        },
+        {
+          "command": "csharpWorkbench.newSolutionFolder",
+          "when": "viewItem =~ /^cw\\.solution(Folder)?$/",
+          "group": "0_project@3"
+        },
+        {
+          "command": "csharpWorkbench.addProjectReference",
+          "when": "viewItem =~ /^cw\\.project(\\.|$)/",
+          "group": "2_dep@1"
+        },
+        {
+          "command": "csharpWorkbench.addNugetPackage",
+          "when": "viewItem =~ /^cw\\.project(\\.|$)/",
+          "group": "2_dep@2"
         }
       ]
     },
