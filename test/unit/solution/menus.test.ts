@@ -64,7 +64,10 @@ describe('task 11 final menus', () => {
   const ctx = menus['view/item/context'] as Array<{ command?: string; submenu?: string; when?: string; group?: string }>;
   const VALUES = ['cw.solution', 'cw.solutionFolder', 'cw.project', 'cw.project.startup', 'cw.folder', 'cw.file', 'cw.packages', 'cw.package', 'cw.projectRefs', 'cw.projectRef'];
   it('every entry has group@order', () => {
-    for (const m of ctx) expect(m.group, m.command ?? m.submenu).toMatch(/^[1-9]_[a-z]+@\d+(\.\d+)?$/);
+    for (const m of ctx) {
+      const re = m.command === 'csharpWorkbench.projectProperties' ? /^9_properties@1$/ : /^[1-7]_[a-z]+@\d+(\.\d+)?$/;
+      expect(m.group, m.command ?? m.submenu).toMatch(re);
+    }
   });
   it('no command twice in the same menu with overlapping when', () => {
     for (const [name, list] of Object.entries(menus)) {
@@ -127,6 +130,7 @@ describe('project properties menu', () => {
     expect(regexOf(item.when!).test('cw.project')).toBe(true);
     expect(regexOf(item.when!).test('cw.project.startup')).toBe(true);
     expect(regexOf(item.when!).test('cw.projectRef')).toBe(false);
+    expect(regexOf(item.when!).test('cw.projects')).toBe(false);
   });
   it('save command is hidden from the palette', () => {
     expect(menus.commandPalette.some((m) => m.command === 'csharpWorkbench.projectProperties.save' && m.when === 'false')).toBe(true);

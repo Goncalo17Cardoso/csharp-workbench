@@ -138,5 +138,6 @@
   "Package": "Package",
   "Assembly": "Assembly",
   "Debug": "Debug",
-  "Secrets": "Secrets"
+  "Secrets": "Secrets",
+  "The changes to {0} were not saved.": "The changes to {0} were not saved."
 }

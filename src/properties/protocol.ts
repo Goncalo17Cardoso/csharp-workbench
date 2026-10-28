@@ -6,7 +6,7 @@ export type PropsToHost =
   | { type: 'ready' }
   | { type: 'save'; edits: PropertyEdit[] }
   | { type: 'reload' }
-  | { type: 'dirty'; dirty: boolean }
+  | { type: 'dirty'; dirty: boolean; edits: PropertyEdit[] }
   | { type: 'openCsproj'; property: string }
   | { type: 'manageSecrets' };
 
@@ -15,5 +15,4 @@ export type PropsToWebview =
   | { type: 'model'; model: PropertiesModel; labels: Record<string, string> }
   | { type: 'saved' }
   | { type: 'error'; message: string }
-  | { type: 'changedOnDisk' }
-  | { type: 'requestSave' }; // Cmd+S: the webview answers with a `save` message
+  | { type: 'changedOnDisk' };

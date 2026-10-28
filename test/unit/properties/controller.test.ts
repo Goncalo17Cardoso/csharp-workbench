@@ -49,7 +49,7 @@ describe('PropertiesController', () => {
     const { s, c } = mk();
     await c.handle({ type: 'ready' });
     s.posts.length = 0;
-    await c.handle({ type: 'dirty', dirty: true });
+    await c.handle({ type: 'dirty', dirty: true, edits: setVersion });
     await c.handle({ type: 'save', edits: setVersion });
     expect(types(s)).toEqual(['saved', 'model']);
     expect(s.text).toContain('<Version>1.2.3</Version>');
@@ -70,11 +70,13 @@ describe('PropertiesController', () => {
     const { s, c } = mk();
     await c.handle({ type: 'ready' });
     s.posts.length = 0;
+    s.text = s.text + '<!-- external -->';
     c.onFileChanged();
     await flush();
     expect(types(s)).toEqual(['model']);
     s.posts.length = 0;
-    await c.handle({ type: 'dirty', dirty: true });
+    await c.handle({ type: 'dirty', dirty: true, edits: [] });
+    s.text = s.text + '<!-- external 2 -->';
     c.onFileChanged();
     await flush();
     expect(types(s)).toEqual(['changedOnDisk']);
@@ -95,5 +97,35 @@ describe('PropertiesController', () => {
     await c.handle({ type: 'openCsproj', property: 'Version' });
     expect(s.secrets).toBe(1);
     expect(s.opened).toEqual(['Version']);
+  });
+
+  it('dirty stores the edits and saveCurrent saves them', async () => {
+    const { s, c } = mk();
+    await c.handle({ type: 'ready' });
+    await c.handle({ type: 'dirty', dirty: true, edits: setVersion });
+    expect(c.pendingEdits).toEqual(setVersion);
+    expect(await c.saveCurrent()).toBe(true);
+    expect(s.text).toContain('<Version>1.2.3</Version>');
+    expect(c.pendingEdits).toEqual([]);
+  });
+
+  it('saveCurrent on a ChangedOnDisk failure writes nothing and returns false', async () => {
+    const { s, c } = mk({ diskChangesBeforeWrite: true });
+    await c.handle({ type: 'ready' });
+    await c.handle({ type: 'dirty', dirty: true, edits: setVersion });
+    expect(await c.saveCurrent()).toBe(false);
+    expect(s.writes).toBe(0);
+  });
+
+  it('the watcher event from our own save does not post changedOnDisk', async () => {
+    const { s, c } = mk();
+    await c.handle({ type: 'ready' });
+    await c.handle({ type: 'dirty', dirty: true, edits: setVersion });
+    await c.handle({ type: 'save', edits: setVersion });
+    s.posts.length = 0;
+    await c.handle({ type: 'dirty', dirty: true, edits: [] });
+    c.onFileChanged(); // disk text equals what we wrote
+    await flush();
+    expect(s.posts).toEqual([]);
   });
 });

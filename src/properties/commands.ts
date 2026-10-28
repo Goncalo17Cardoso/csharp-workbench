@@ -16,7 +16,7 @@ interface Deps {
   getCli(): Promise<DotnetCli | undefined>;
 }
 
-interface Open { panel: PropertiesPanel; controller: PropertiesController }
+interface Open { panel?: PropertiesPanel; controller?: PropertiesController }
 
 const readText = (p: string) => fsp.readFile(p, 'utf8');
 const projName = (p: string) => path.basename(p).replace(/\.[a-z]+proj$/i, '');
@@ -45,11 +45,14 @@ export function registerPropertiesCommands(deps: Deps): vscode.Disposable[] {
   async function openProperties(node?: TreeNode): Promise<void> {
     const project = node?.kind === 'project' ? node.path : await pickProject();
     if (!project) return;
-    const existing = open.get(project);
-    if (existing) { existing.panel.reveal(); return; }
-
+    if (open.has(project)) { open.get(project)!.panel?.reveal(); return; }
+    open.set(project, {}); // placeholder before the first await: a second invocation must not open another panel
     const cli = await deps.getCli();
-    if (!cli) { void vscode.window.showErrorMessage(vscode.l10n.t('The .NET SDK was not found')); return; }
+    if (!cli) {
+      open.delete(project);
+      void vscode.window.showErrorMessage(vscode.l10n.t('The .NET SDK was not found'));
+      return;
+    }
 
     const controller: PropertiesController = new PropertiesController(project, {
       readText,
@@ -68,25 +71,32 @@ export function registerPropertiesCommands(deps: Deps): vscode.Disposable[] {
         open.delete(project);
         watcher.dispose();
         if (controller.dirty) {
-          // A webview close cannot be cancelled, so "Save" reopens the page with the project reloaded.
           void vscode.window.showWarningMessage(
             vscode.l10n.t('Save changes to the properties of {0}?', projName(project)),
             { modal: true }, vscode.l10n.t('Save'), vscode.l10n.t('Don\'t Save'),
-          ).then((choice) => { if (choice === vscode.l10n.t('Save')) void openProperties({ kind: 'project', path: project } as TreeNode); });
+          ).then(async (choice) => {
+            if (choice !== vscode.l10n.t('Save')) return;
+            if (!(await controller.saveCurrent())) {
+              void vscode.window.showErrorMessage(vscode.l10n.t('The changes to {0} were not saved.', projName(project)));
+            }
+          });
         }
       },
     );
     const watcher = vscode.workspace.createFileSystemWatcher(
       new vscode.RelativePattern(vscode.Uri.file(path.dirname(project)), path.basename(project)),
     );
-    watcher.onDidChange(() => controller.onFileChanged());
+    const changed = () => controller.onFileChanged();
+    watcher.onDidChange(changed);
+    watcher.onDidCreate(changed);
+    watcher.onDidDelete(changed);
     open.set(project, { panel, controller });
   }
 
   return [
     vscode.commands.registerCommand('csharpWorkbench.projectProperties', (n?: TreeNode) => openProperties(n)),
     vscode.commands.registerCommand('csharpWorkbench.projectProperties.save', () => {
-      for (const o of open.values()) if (o.panel.active) o.panel.post({ type: 'requestSave' });
+      for (const o of open.values()) if (o.panel?.active) void o.controller?.saveCurrent();
     }),
   ];
 }
