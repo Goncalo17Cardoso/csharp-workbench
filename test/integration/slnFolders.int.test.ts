@@ -53,10 +53,11 @@ describe.skipIf(!dotnet)('solution-folder edits validated by the dotnet CLI', ()
       const model = () => loadSolution(sln, read);
       const newGuid = () => randomUUID();
       const edit = async (change: (text: string) => string) => {
-        await writeSolutionAtomically(sln, change(await read()), {
+        const original = await read();
+        await writeSolutionAtomically(sln, change(original), {
           ...nodeSolutionFs,
           validate: async () => { await cli().slnList(sln); },
-        });
+        }, original);
         await cli().slnList(sln); // still valid after the edit
       };
 
@@ -91,13 +92,14 @@ describe.skipIf(!dotnet)('solution-folder edits validated by the dotnet CLI', ()
 
       // A result that dotnet rejects is rolled back byte for byte.
       const before = await fs.readFile(sln);
+      const beforeText = await read();
       const broken = kind === 'sln' ? 'not a solution\r\n' : '<Solution>\n  <Folder Name="/x/">\n</Solution>\n';
       await expect(writeSolutionAtomically(sln, broken, {
         ...nodeSolutionFs,
         validate: async () => { await cli().slnList(sln); },
-      })).rejects.toThrow(/dotnet sln failed/);
+      }, beforeText)).rejects.toThrow(/dotnet sln failed/);
       expect(await fs.readFile(sln)).toEqual(before);
-      expect((await fs.readdir(root)).filter((f) => f.endsWith('.cw-tmp'))).toEqual([]);
+      expect((await fs.readdir(root)).filter((f) => /\.cw-(tmp|bak)$/.test(f))).toEqual([]);
     }, T);
   }
 });

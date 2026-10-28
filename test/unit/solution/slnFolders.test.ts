@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import * as path from 'node:path';
-import { addFolder, removeEmptyFolder, renameFolder, validateFolderName } from '../../../src/solution/slnFolders';
+import { addFolder, assertFolderEdit, removeEmptyFolder, renameFolder, validateFolderName } from '../../../src/solution/slnFolders';
 import { parseSln, parseSlnx } from '../../../src/solution/slnParse';
 
 const dir = path.resolve(__dirname, '../../fixtures/solution');
@@ -99,6 +99,21 @@ describe('sln addFolder', () => {
     expect(out).toContain(`    GlobalSection(NestedProjects) = preSolution\n        ${G2} = ${G1}\n    EndGlobalSection\nEndGlobal\n`);
   });
 
+  it('uses the line ending of the anchor lines in a mixed file (LF first line, CRLF body)', () => {
+    const mixed = EMPTY_SLN.replace('\r\n', '\n');
+    expect(mixed.startsWith('﻿\nMicrosoft')).toBe(true);
+    const a = addFolder(mixed, 'sln', 'a', undefined, guids(G1));
+    expect(lines(a)).toEqual(splice(mixed, indexOfLine(mixed, 'Global\r\n'), 0,
+      `Project("${FOLDER}") = "a", "a", "${G1}"\r\n`, 'EndProject\r\n'));
+    const ab = addFolder(a, 'sln', 'b', G1, guids(G2));
+    expect(ab.slice(1).replace(/\r\n/g, '')).toBe(ab.slice(1).replace(/\r\n/g, '').replace(/\n/, '')
+      .replace(/^/, '\n')); // the only bare LF is still the first one
+    expect(ab).toContain(`EndProject\r\nProject("${FOLDER}") = "b", "b", "${G2}"\r\nEndProject\r\nGlobal\r\n`);
+    expect(ab).toContain(`\tGlobalSection(NestedProjects) = preSolution\r\n\t\t${G2} = ${G1}\r\n\tEndGlobalSection\r\nEndGlobal\r\n`);
+    const abc = addFolder(ab, 'sln', 'c', G1, guids(G1.replace('1', '3')));
+    expect(abc).toContain(`\t\t${G2} = ${G1}\r\n\t\t${G1.replace('1', '3')} = ${G1}\r\n\tEndGlobalSection\r\n`);
+  });
+
   it('accepts an already braced upper-case GUID from newGuid', () => {
     const out = addFolder(vsSln, 'sln', 'docs', undefined, () => G1);
     expect(sln(out).folders.some((f) => f.id === G1)).toBe(true);
@@ -187,11 +202,27 @@ describe('slnx addFolder', () => {
     expect(slnx(out).folders.find((f) => f.id === '/src/web/api/')!.parentId).toBe('/src/web/');
   });
 
-  it('first child of an empty Solution, adding missing ancestors like dotnet sln does', () => {
+  it('first child of an empty Solution', () => {
     const empty = '<Solution>\n</Solution>\n'; // dotnet new sln --format slnx
-    const out = addFolder(empty, 'slnx', 'y', '/x/', guids(G1));
-    expect(out).toBe('<Solution>\n  <Folder Name="/x/" />\n  <Folder Name="/x/y/" />\n</Solution>\n');
-    expect(slnx(out).folders).toEqual([{ id: '/x/', name: 'x' }, { id: '/x/y/', name: 'y', parentId: '/x/' }]);
+    const out = addFolder(empty, 'slnx', 'x', undefined, guids(G1));
+    expect(out).toBe('<Solution>\n  <Folder Name="/x/" />\n</Solution>\n');
+  });
+
+  it('throws for an unknown parent, but fills in missing ancestors of an existing parent like dotnet sln does', () => {
+    expect(() => addFolder('<Solution>\n</Solution>\n', 'slnx', 'y', '/x/', guids(G1))).toThrow('Solution folder not found');
+    expect(() => addFolder(basicSlnx, 'slnx', 'y', '/nope/', guids(G1))).toThrow('Solution folder not found');
+    const t = '<Solution>\n  <Folder Name="/x/y/" />\n</Solution>\n';
+    const out = addFolder(t, 'slnx', 'z', '/x/y/', guids(G1));
+    expect(out).toBe('<Solution>\n  <Folder Name="/x/y/" />\n  <Folder Name="/x/" />\n  <Folder Name="/x/y/z/" />\n</Solution>\n');
+    expect(slnx(out).folders.map((f) => f.id)).toEqual(['/x/y/', '/x/', '/x/y/z/']);
+  });
+
+  it('uses the line ending of the anchor line in a mixed file', () => {
+    const t = '<Solution>\n  <Folder Name="/a/" />\r\n</Solution>\r\n';
+    expect(addFolder(t, 'slnx', 'b', undefined, guids(G1)))
+      .toBe('<Solution>\n  <Folder Name="/a/" />\r\n  <Folder Name="/b/" />\r\n</Solution>\r\n');
+    expect(addFolder('<Solution>\r\n</Solution>\n', 'slnx', 'b', undefined, guids(G1)))
+      .toBe('<Solution>\r\n  <Folder Name="/b/" />\r\n</Solution>\n');
   });
 
   it('expands a self-closing Solution and keeps CRLF', () => {
@@ -278,5 +309,86 @@ describe('validateFolderName', () => {
     expect(validateFolderName('Src', ['tests', 'src'])).toBe('A solution folder with this name already exists.');
     expect(validateFolderName('src2', ['tests', 'src'])).toBeUndefined();
     expect(validateFolderName('My Folder #1')).toBeUndefined();
+  });
+});
+
+describe('assertFolderEdit postconditions (dotnet sln list accepts all of these)', () => {
+  const SRC = '{827E0CD3-B72D-47B6-A68D-7590B98EB39B}';
+  const WEB = '{03997797-E7F5-0643-168D-B8EA7178C2FE}';
+  const TESTS = '{0AB3BF05-4346-4AA6-1389-037BE0695223}';
+  const WEB_PROJ = '{CAA98628-E3AD-4987-A882-DF34EAAA5130}';
+  const DEAD = '{DEADDEAD-0000-4000-8000-000000000000}';
+  const add = { op: 'add', id: G1, name: 'docs', parentId: SRC } as const;
+  const good = addFolder(vsSln, 'sln', 'docs', SRC, guids(G1));
+  const nestLine = `\t\t${G1} = ${SRC}\r\n`;
+  const check = (after: string, change: Parameters<typeof assertFolderEdit>[3] = add) =>
+    () => assertFolderEdit('sln', vsSln, after, change);
+  const FAILED = 'Solution folder edit failed its consistency check';
+
+  it('accepts the real edit outputs', () => {
+    expect(check(good)).not.toThrow();
+    expect(() => assertFolderEdit('sln', good, renameFolder(good, 'sln', G1, 'd2'), { op: 'rename', id: G1, newName: 'd2' })).not.toThrow();
+    expect(() => assertFolderEdit('sln', good, removeEmptyFolder(good, 'sln', G1), { op: 'remove', id: G1 })).not.toThrow();
+  });
+
+  it.each([
+    ['a dangling parent GUID', good.replace(nestLine, nestLine + `\t\t${G2} = ${DEAD}\r\n`)],
+    ['a dangling child GUID', good.replace(nestLine, nestLine + `\t\t${DEAD} = ${G1}\r\n`)],
+    ['a folder nested under a project', good.replace(nestLine, `\t\t${G1} = ${WEB_PROJ}\r\n`)],
+    ['trailing garbage', good + 'garbage\r\n'],
+    ['duplicate nesting lines', good.replace(nestLine, nestLine + nestLine)],
+    ['an unterminated extra NestedProjects section', good.replace(/EndGlobal\r\n$/, '\tGlobalSection(NestedProjects) = preSolution\r\nEndGlobal\r\n')],
+    ['a folder with no EndProject', good.replace(`"${G1}"\r\nEndProject\r\n`, `"${G1}"\r\n`)],
+    ['a duplicate GUID', good.replace('Global\r\n', `Project("${FOLDER}") = "docs", "docs", "${G1}"\r\nEndProject\r\nGlobal\r\n`)],
+    ['a duplicate sibling name', good.replace('Global\r\n', `Project("${FOLDER}") = "Docs", "Docs", "${G2}"\r\nEndProject\r\nGlobal\r\n`)
+      .replace(nestLine, nestLine + `\t\t${G2} = ${SRC}\r\n`)],
+    ['a file truncated before EndGlobal', good.replace(/EndGlobal\r\n$/, '')],
+    ['a missing Global', good.replace('Global\r\n', '')],
+    ['a self-cycle', good.replace(nestLine, `\t\t${G1} = ${G1}\r\n`)],
+    ['another folder moved', good.replace(`${WEB} = ${SRC}`, `${WEB} = ${TESTS}`)],
+    ['a project moved', good.replace(`${WEB_PROJ} = ${WEB}`, `${WEB_PROJ} = ${SRC}`)],
+    ['the new folder at the root instead of under its parent', good.replace(nestLine, '')],
+    ['the new folder with another name', good.replace('"docs", "docs"', '"doc", "doc"')],
+    ['another folder renamed', good.replace('"tests", "tests"', '"test", "test"')],
+    ['another folder removed', good.replace(`Project("${FOLDER}") = "tests", "tests", "${TESTS}"\r\nEndProject\r\n`, '')],
+  ])('rejects an add result with %s', (_label, after) => {
+    expect(after).not.toBe(good);
+    expect(check(after)).toThrow(FAILED);
+  });
+
+  it('rejects rename and remove results that touch more than the folder', () => {
+    const renamed = renameFolder(good, 'sln', G1, 'd2');
+    expect(() => assertFolderEdit('sln', good, renamed.replace('"src", "src"', '"s", "s"'), { op: 'rename', id: G1, newName: 'd2' })).toThrow(FAILED);
+    const removed = removeEmptyFolder(good, 'sln', G1);
+    expect(() => assertFolderEdit('sln', good, removed.replace(`\t\t${WEB} = ${SRC}\r\n`, ''), { op: 'remove', id: G1 })).toThrow(FAILED);
+    expect(() => assertFolderEdit('sln', good, removed + 'x', { op: 'remove', id: G1 })).toThrow(FAILED);
+  });
+
+  it('tolerates problems the original file already had, but not new ones', () => {
+    const messy = vsSln + 'trailing\r\n';
+    const out = addFolder(messy, 'sln', 'docs', undefined, guids(G1));
+    expect(sln(out).folders.some((f) => f.id === G1)).toBe(true);
+    expect(() => assertFolderEdit('sln', messy, out.replace(/EndGlobal\r\n/, ''), { op: 'add', id: G1, name: 'docs' })).toThrow(FAILED);
+  });
+
+  it('checks slnx results too', () => {
+    const before = basicSlnx;
+    const ok = addFolder(before, 'slnx', 'api', '/src/web/', guids(G1));
+    const change = { op: 'add', id: '/src/web/api/', name: 'api', parentId: '/src/web/' } as const;
+    expect(() => assertFolderEdit('slnx', before, ok, change)).not.toThrow();
+    for (const bad of [
+      ok.replace('<Folder Name="/src/web/api/" />', '<Folder Name="/src/web/api/">'), // malformed XML
+      ok.replace('<Folder Name="/src/web/api/" />', '<Folder Name="/src/web/api/" /><Folder Name="/src/web/api/" />'), // duplicate
+      ok.replace('<Folder Name="/src/web/api/" />', '<Folder Name="/src/web/API/" /><Folder Name="/src/web/api/" />'), // sibling clash
+      ok.replace('  <Folder Name="/tests/">\n    <Project Path="tests/My App #1/Tests.csproj" />\n', '  <Folder Name="/tests/">\n'), // project lost
+      ok + '<x/>', // trailing content
+    ]) {
+      expect(bad).not.toBe(ok);
+      expect(() => assertFolderEdit('slnx', before, bad, change), bad).toThrow(FAILED);
+    }
+    const selfClosing = '<?xml version="1.0"?>\n<!-- c --><Solution />\n';
+    const added = addFolder(selfClosing, 'slnx', 'a', undefined, guids(G1));
+    expect(() => assertFolderEdit('slnx', selfClosing, added, { op: 'add', id: '/a/', name: 'a' })).not.toThrow();
+    expect(() => assertFolderEdit('slnx', selfClosing, added + '<x/>', { op: 'add', id: '/a/', name: 'a' })).toThrow(FAILED);
   });
 });
