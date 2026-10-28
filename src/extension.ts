@@ -10,11 +10,20 @@ import { findDotnet } from './dotnet/locate';
 import { createOutput } from './output';
 import { PanelManager, type PanelTestHooks } from './panel/PanelManager';
 import type { ToHost } from './panel/protocol';
+import { registerFileCommands } from './solution/commands/fileCommands';
+import { registerRunCommands } from './solution/commands/run';
+import { registerSecretsCommands } from './solution/commands/secrets';
+import { registerSolutionCommands } from './solution/commands/solution';
+import { setConfirmOverride } from './solution/confirm';
+import { SolutionTreeProvider } from './solution/SolutionTreeProvider';
+import type { SolutionTreeCore } from './solution/treeCore';
 import { selectTargets } from './workspace/targets';
 
 /** Returned from activate() for the integration tests; production code never sets the hooks. */
 export interface ExtensionApi extends PanelTestHooks {
   send(targetPath: string, msg: ToHost): Promise<void>;
+  /** Solution Explorer hooks (Test mode only). `run` executes `csharpWorkbench.<command>`. */
+  solution?: { core: SolutionTreeCore; run(command: string, ...args: unknown[]): Promise<unknown> };
 }
 
 const exists = (p: string) => fsp.access(p).then(() => true, () => false);
@@ -122,6 +131,42 @@ export function activate(context: vscode.ExtensionContext): ExtensionApi | undef
     if (!(await checkSlnxSdk(target))) return;
     mgr.open(target, { preselectProject });
   }
+
+  // The explorer reads files itself; dotnet is only needed for item evaluation and falls back to a disk walk.
+  const explorer = new SolutionTreeProvider(context.workspaceState, async () => {
+    const dotnet = await resolveDotnet();
+    return dotnet ? new DotnetCli(nodeExec, dotnet, output) : undefined;
+  });
+  context.subscriptions.push(...explorer.register());
+  if (api) {
+    api.solution = {
+      core: explorer.treeCore,
+      run: (command, ...args) => Promise.resolve(vscode.commands.executeCommand(`csharpWorkbench.${command}`, ...args)),
+    };
+  }
+  setConfirmOverride(() => api?.confirmOverride);
+  context.subscriptions.push(...registerFileCommands({
+    provider: explorer,
+    getCli: async () => { const d = await resolveDotnet(); return d ? new DotnetCli(nodeExec, d, output) : undefined; },
+    showOutput: () => channel.show(true),
+  }));
+  context.subscriptions.push(...registerSolutionCommands({
+    provider: explorer,
+    ws: context.workspaceState,
+    getCli: async () => { const d = await resolveDotnet(); return d ? new DotnetCli(nodeExec, d, output) : undefined; },
+    showOutput: () => channel.show(true),
+  }));
+
+  context.subscriptions.push(...registerRunCommands({
+    provider: explorer,
+    ws: context.workspaceState,
+    getCli: async () => { const d = await resolveDotnet(); return d ? new DotnetCli(nodeExec, d, output) : undefined; },
+    resolveDotnet,
+  }));
+
+  context.subscriptions.push(...registerSecretsCommands({
+    getCli: async () => { const d = await resolveDotnet(); return d ? new DotnetCli(nodeExec, d, output) : undefined; },
+  }));
 
   context.subscriptions.push(
     vscode.commands.registerCommand('csharpWorkbench.manageNuget', (uri?: vscode.Uri) => manageNuget(uri)),

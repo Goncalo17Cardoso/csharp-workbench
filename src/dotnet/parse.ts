@@ -46,3 +46,22 @@ export function parseListPackageJson(json: string): ProjectPackages[] {
 export function parseSdkVersion(stdout: string): string {
   return stdout.trim().split(/\r?\n/)[0].trim();
 }
+
+export interface EvaluatedItem { identity: string; fullPath: string; link?: string }
+
+interface RawItem { Identity: string; FullPath: string; Link?: string }
+
+/** Parses `dotnet msbuild -getItem:...` JSON into items per type; Link separators are normalised to `/`. */
+export function parseGetItems(json: string): Record<string, EvaluatedItem[]> {
+  const start = json.indexOf('{');
+  const data = JSON.parse(start >= 0 ? json.slice(start) : json) as { Items?: Record<string, RawItem[]> };
+  const out: Record<string, EvaluatedItem[]> = {};
+  for (const [type, items] of Object.entries(data.Items ?? {})) {
+    out[type] = items.map((i) => ({
+      identity: i.Identity,
+      fullPath: i.FullPath,
+      ...(i.Link ? { link: i.Link.replace(/\\/g, '/') } : {}),
+    }));
+  }
+  return out;
+}

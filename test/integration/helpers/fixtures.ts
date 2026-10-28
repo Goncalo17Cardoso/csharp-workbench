@@ -42,3 +42,48 @@ export async function createFixtureSolution(
   }
   return { sln, projects, props };
 }
+
+export interface SolutionExplorerFixture {
+  sln: string;
+  /** ASP.NET Core project MyApp.Api in `src/web/My App #1/`. */
+  api: string;
+  /** Classlib MyApp.Core with a `Models` folder. */
+  core: string;
+  /** xunit project MyApp.Tests. */
+  tests: string;
+  /** Template short names actually used (webapi/xunit may be unavailable offline). */
+  templates: { api: string; tests: string };
+}
+
+/**
+ * Creates the Solution Explorer fixture in `dir`: folders `src` (with `src/web`) and `tests`,
+ * MyApp.Api (path with a space and `#`), MyApp.Core with Models/, MyApp.Tests, appsettings.Development.json.
+ * Uses real `dotnet new` / `dotnet sln add --solution-folder`; restores before returning.
+ */
+export async function createSolutionExplorerFixture(
+  dir: string,
+  opts: { dotnetPath?: string } = {},
+): Promise<SolutionExplorerFixture> {
+  const dn = opts.dotnetPath ?? 'dotnet';
+  await fs.mkdir(dir, { recursive: true });
+  await dotnet(dn, ['new', 'sln', '--format', 'sln', '-n', 'MySln'], dir).catch(() => dotnet(dn, ['new', 'sln', '-n', 'MySln'], dir));
+  const sln = path.join(dir, 'MySln.sln');
+
+  const apiDir = path.join(dir, 'src', 'web', 'My App #1');
+  const apiTemplate = await dotnet(dn, ['new', 'webapi', '-n', 'MyApp.Api', '-o', apiDir, '-f', 'net8.0'], dir).then(() => 'webapi'); // no fallback: SDK 8 ships webapi, and a substitute could make the nesting test vacuous
+  const api = path.join(apiDir, 'MyApp.Api.csproj');
+
+  await dotnet(dn, ['new', 'classlib', '-n', 'MyApp.Core', '-o', path.join(dir, 'MyApp.Core'), '-f', 'net8.0'], dir);
+  const core = path.join(dir, 'MyApp.Core', 'MyApp.Core.csproj');
+  await fs.mkdir(path.join(dir, 'MyApp.Core', 'Models'), { recursive: true });
+  await fs.writeFile(path.join(dir, 'MyApp.Core', 'Models', 'Address.cs'), 'namespace MyApp.Core.Models;\n\npublic class Address { }\n');
+
+  const testsTemplate = await dotnet(dn, ['new', 'xunit', '-n', 'MyApp.Tests', '-o', path.join(dir, 'tests', 'MyApp.Tests'), '-f', 'net8.0'], dir).then(() => 'xunit');
+  const tests = path.join(dir, 'tests', 'MyApp.Tests', 'MyApp.Tests.csproj');
+
+  await dotnet(dn, ['sln', sln, 'add', '--solution-folder', 'src/web', api], dir);
+  await dotnet(dn, ['sln', sln, 'add', core], dir);
+  await dotnet(dn, ['sln', sln, 'add', '--solution-folder', 'tests', tests], dir);
+  await dotnet(dn, ['restore', sln], dir);
+  return { sln, api, core, tests, templates: { api: apiTemplate, tests: testsTemplate } };
+}

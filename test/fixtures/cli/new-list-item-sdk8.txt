@@ -1,0 +1,22 @@
+These templates matched your input: --type='item'
+
+Template Name                         Short Name                  Language    Tags         
+------------------------------------  --------------------------  ----------  -------------
+API Controller                        apicontroller               [C#]        Web/ASP.NET  
+dotnet gitignore file                 gitignore,.gitignore                    Config       
+Dotnet local tool manifest file       tool-manifest                           Config       
+EditorConfig file                     editorconfig,.editorconfig              Config       
+global.json file                      globaljson,global.json                  Config       
+MSBuild Directory.Build.props file    buildprops                              MSBuild/props
+MSBuild Directory.Build.targets file  buildtargets                            MSBuild/props
+MVC Controller                        mvccontroller               [C#]        Web/ASP.NET  
+MVC ViewImports                       viewimports                 [C#]        Web/ASP.NET  
+MVC ViewStart                         viewstart                   [C#]        Web/ASP.NET  
+NuGet Config                          nugetconfig,nuget.config                Config       
+NUnit 3 Test Item                     nunit-test                  [C#],F#,VB  Test/NUnit   
+Protocol Buffer File                  proto                                   Web/gRPC     
+Razor Component                       razorcomponent              [C#]        Web/ASP.NET  
+Razor Page                            page                        [C#]        Web/ASP.NET  
+Razor View                            view                        [C#]        Web/ASP.NET  
+Web Config                            webconfig                               Config       
+

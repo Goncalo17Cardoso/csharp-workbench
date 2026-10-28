@@ -49,3 +49,60 @@ describe('DotnetCli', () => {
     expect(out.log).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('DotnetCli solution explorer wrappers', () => {
+  const call = async (f: (c: DotnetCli) => Promise<unknown>, res?: { code: number; stdout: string; stderr: string }) => {
+    const m = mk(res);
+    const r = await f(m.cli);
+    return { args: m.exec.mock.calls[0][1], cwd: (m.exec.mock.calls[0][2] as { cwd: string }).cwd, r };
+  };
+  it('slnAdd builds --solution-folder args', async () => {
+    expect((await call((c) => c.slnAdd('/s/A.sln', '/s/p/P.csproj', 'src/web'))).args)
+      .toEqual(['sln', '/s/A.sln', 'add', '/s/p/P.csproj', '--solution-folder', 'src/web']);
+  });
+  it('slnAdd without folder', async () => {
+    const r = await call((c) => c.slnAdd('/s/A.sln', '/s/p/P.csproj'));
+    expect(r.args).toEqual(['sln', '/s/A.sln', 'add', '/s/p/P.csproj']);
+    expect(r.cwd).toBe('/s');
+  });
+  it('slnRemove', async () => {
+    expect((await call((c) => c.slnRemove('/s/A.sln', '/s/p/P.csproj'))).args).toEqual(['sln', '/s/A.sln', 'remove', '/s/p/P.csproj']);
+  });
+  it('add/removeReference', async () => {
+    expect((await call((c) => c.addReference('/s/P.csproj', '/s/Q.csproj'))).args).toEqual(['add', '/s/P.csproj', 'reference', '/s/Q.csproj']);
+    expect((await call((c) => c.removeReference('/s/P.csproj', '/s/Q.csproj'))).args).toEqual(['remove', '/s/P.csproj', 'reference', '/s/Q.csproj']);
+  });
+  it('newTemplate uses given cwd', async () => {
+    const r = await call((c) => c.newTemplate('class', ['-n', 'Foo'], '/s/My App #1'));
+    expect(r.args).toEqual(['new', 'class', '-n', 'Foo']);
+    expect(r.cwd).toBe('/s/My App #1');
+  });
+  it('newList defaults to item, accepts project', async () => {
+    const a = await call((c) => c.newList(), { code: 0, stdout: 'x', stderr: '' });
+    expect(a.args).toEqual(['new', 'list', '--type', 'item']);
+    expect(a.r).toBe('x');
+    expect((await call((c) => c.newList('project'))).args).toEqual(['new', 'list', '--type', 'project']);
+  });
+  it('newHelp', async () => {
+    expect((await call((c) => c.newHelp('class'))).args).toEqual(['new', 'class', '--help']);
+  });
+  it('userSecretsInit', async () => {
+    expect((await call((c) => c.userSecretsInit('/s/P.csproj'))).args).toEqual(['user-secrets', 'init', '--project', '/s/P.csproj']);
+  });
+  it('getItems', async () => {
+    expect((await call((c) => c.getItems('/s/P.csproj', ['Compile', 'None']))).args)
+      .toEqual(['msbuild', '/s/P.csproj', '-getItem:Compile', '-getItem:None']);
+  });
+  it('msbuild evaluations run with a 60 s timeout, other commands without', async () => {
+    const m = mk({ code: 0, stdout: 'x', stderr: '' });
+    await m.cli.getItems('/s/P.csproj', ['Compile']);
+    await m.cli.getProperty('/s/P.csproj', 'TargetPath');
+    await m.cli.restore('/s/P.csproj');
+    expect(m.exec.mock.calls.map((c) => (c[2] as { timeoutMs?: number }).timeoutMs)).toEqual([60_000, 60_000, undefined]);
+  });
+  it('getProperty trims, with props', async () => {
+    const r = await call((c) => c.getProperty('/s/P.csproj', 'RootNamespace', { Configuration: 'Debug' }), { code: 0, stdout: ' Ns\n', stderr: '' });
+    expect(r.args).toEqual(['msbuild', '/s/P.csproj', '-getProperty:RootNamespace', '-p:Configuration=Debug']);
+    expect(r.r).toBe('Ns');
+  });
+});
