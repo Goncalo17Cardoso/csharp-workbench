@@ -1,0 +1,21 @@
+{
+  "Items": {
+    "Compile": [
+      {
+        "Identity": "Class1.cs",
+        "FullPath": "/work/Lib/Class1.cs"
+      },
+      {
+        "Identity": "../Shared/Shared.cs",
+        "Link": "Shared\\Shared.cs",
+        "FullPath": "/work/Shared/Shared.cs"
+      }
+    ],
+    "None": [
+      {
+        "Identity": "getitem.json",
+        "FullPath": "/work/Lib/getitem.json"
+      }
+    ]
+  }
+}

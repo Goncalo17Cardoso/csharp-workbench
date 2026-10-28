@@ -54,4 +54,47 @@ export class DotnetCli {
     const stdout = await this.run(['nuget', 'config', 'paths', '--working-directory', dir], dir);
     return stdout.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
   }
+
+  async slnAdd(sln: string, project: string, solutionFolder?: string): Promise<void> {
+    const args = ['sln', sln, 'add', project];
+    if (solutionFolder) args.push('--solution-folder', solutionFolder);
+    await this.run(args, dirname(sln));
+  }
+
+  async slnRemove(sln: string, project: string): Promise<void> {
+    await this.run(['sln', sln, 'remove', project], dirname(sln));
+  }
+
+  async addReference(project: string, ref: string): Promise<void> {
+    await this.run(['add', project, 'reference', ref], dirname(project));
+  }
+
+  async removeReference(project: string, ref: string): Promise<void> {
+    await this.run(['remove', project, 'reference', ref], dirname(project));
+  }
+
+  async newTemplate(shortName: string, args: string[], cwd: string): Promise<void> {
+    await this.run(['new', shortName, ...args], cwd);
+  }
+
+  async newList(type: 'item' | 'project' = 'item'): Promise<string> {
+    return this.run(['new', 'list', '--type', type], process.cwd());
+  }
+
+  async newHelp(shortName: string): Promise<string> {
+    return this.run(['new', shortName, '--help'], process.cwd());
+  }
+
+  async userSecretsInit(project: string): Promise<void> {
+    await this.run(['user-secrets', 'init', '--project', project], dirname(project));
+  }
+
+  async getItems(project: string, types: string[]): Promise<string> {
+    return this.run(['msbuild', project, ...types.map((t) => `-getItem:${t}`)], dirname(project));
+  }
+
+  async getProperty(project: string, name: string, props: Record<string, string> = {}): Promise<string> {
+    const p = Object.entries(props).map(([k, v]) => `-p:${k}=${v}`);
+    return (await this.run(['msbuild', project, `-getProperty:${name}`, ...p], dirname(project))).trim();
+  }
 }

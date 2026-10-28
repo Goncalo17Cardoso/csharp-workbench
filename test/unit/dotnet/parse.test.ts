@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { parseSlnList, parseListPackageJson, parseSdkVersion } from '../../../src/dotnet/parse';
+import { parseSlnList, parseListPackageJson, parseSdkVersion, parseGetItems } from '../../../src/dotnet/parse';
 
 const fx = (n: string) => readFileSync(join(__dirname, '../../fixtures/cli', n), 'utf8');
 
@@ -35,5 +35,13 @@ describe('parse', () => {
   });
   it('parses sdk version', () => {
     expect(parseSdkVersion('10.0.102\n')).toBe('10.0.102');
+  });
+  it('parseGetItems reads Compile and None with Link', () => {
+    const r = parseGetItems('notice\n' + fx('getitem.json'));
+    const linked = r.Compile.find((i) => i.identity === '../Shared/Shared.cs');
+    expect(linked?.link).toBe('Shared/Shared.cs');
+    expect(linked?.fullPath.startsWith('/')).toBe(true);
+    expect(r.Compile[0].link).toBeUndefined();
+    expect(r.None).toHaveLength(1);
   });
 });

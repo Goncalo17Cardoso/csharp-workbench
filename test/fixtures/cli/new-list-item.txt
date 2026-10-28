@@ -1,0 +1,30 @@
+These templates matched your input: --type='item'
+
+Template Name                          Short Name                    Language    Tags                      
+-------------------------------------  ----------------------------  ----------  --------------------------
+API Controller                         apicontroller                 [C#]        Web/ASP.NET               
+Class                                  class                         [C#],VB     Common                    
+dotnet gitattributes file              gitattributes,.gitattributes              Config                    
+dotnet gitignore file                  gitignore,.gitignore                      Config                    
+Dotnet local tool manifest file        tool-manifest                             Config                    
+EditorConfig file                      editorconfig,.editorconfig                Config                    
+Enum                                   enum                          [C#],VB     Common                    
+global.json file                       globaljson,global.json                    Config                    
+Interface                              interface                     [C#],VB     Common                    
+MSBuild Directory.Build.props file     buildprops                                MSBuild/props             
+MSBuild Directory.Build.targets file   buildtargets                              MSBuild/props             
+MSBuild Directory.Packages.props file  packagesprops                             MSBuild/packages/props/CPM
+MSTest Test Class                      mstest-class                  [C#],F#,VB  Test/MSTest               
+MVC Controller                         mvccontroller                 [C#]        Web/ASP.NET               
+MVC ViewImports                        viewimports                   [C#]        Web/ASP.NET               
+MVC ViewStart                          viewstart                     [C#]        Web/ASP.NET               
+NuGet Config                           nugetconfig,nuget.config                  Config                    
+NUnit Test Item                        nunit-test                    [C#],F#,VB  Test/NUnit                
+Protocol Buffer File                   proto                                     Web/gRPC                  
+Razor Component                        razorcomponent                [C#]        Web/ASP.NET               
+Razor Page                             page                          [C#]        Web/ASP.NET               
+Razor View                             view                          [C#]        Web/ASP.NET               
+Record                                 record                        [C#]        Common                    
+Struct                                 struct,structure              [C#],VB     Common                    
+Web Config                             webconfig                                 Config                    
+
