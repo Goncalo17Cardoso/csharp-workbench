@@ -1,4 +1,10 @@
 {
   "command.manageNuget.title": "Manage NuGet Packages…",
-  "config.dotnetPath.description": "Absolute path to the `dotnet` executable. Leave empty to search `PATH` and the default install locations."
+  "config.dotnetPath.description": "Absolute path to the `dotnet` executable. Leave empty to search `PATH` and the default install locations.",
+  "command.selectSolution.title": "Select Solution",
+  "command.refresh.title": "Refresh Solution Explorer",
+  "command.showAllFiles.title": "Show All Files",
+  "command.hideAllFiles.title": "Hide Excluded Files",
+  "viewsWelcome.noSolution": "No solution or project found.\n[Manage NuGet Packages](command:csharpWorkbench.manageNuget)",
+  "config.autoReveal.description": "Reveal the active editor's file in the Solution Explorer."
 }

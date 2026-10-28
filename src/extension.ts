@@ -10,6 +10,7 @@ import { findDotnet } from './dotnet/locate';
 import { createOutput } from './output';
 import { PanelManager, type PanelTestHooks } from './panel/PanelManager';
 import type { ToHost } from './panel/protocol';
+import { SolutionTreeProvider } from './solution/SolutionTreeProvider';
 import { selectTargets } from './workspace/targets';
 
 /** Returned from activate() for the integration tests; production code never sets the hooks. */
@@ -122,6 +123,13 @@ export function activate(context: vscode.ExtensionContext): ExtensionApi | undef
     if (!(await checkSlnxSdk(target))) return;
     mgr.open(target, { preselectProject });
   }
+
+  // The explorer reads files itself; dotnet is only needed for item evaluation and falls back to a disk walk.
+  const explorer = new SolutionTreeProvider(context.workspaceState, async () => {
+    const dotnet = await resolveDotnet();
+    return dotnet ? new DotnetCli(nodeExec, dotnet, output) : undefined;
+  });
+  context.subscriptions.push(...explorer.register());
 
   context.subscriptions.push(
     vscode.commands.registerCommand('csharpWorkbench.manageNuget', (uri?: vscode.Uri) => manageNuget(uri)),

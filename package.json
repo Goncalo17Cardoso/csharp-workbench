@@ -44,6 +44,30 @@
         "command": "csharpWorkbench.manageNuget",
         "title": "%command.manageNuget.title%",
         "category": "C# Workbench"
+      },
+      {
+        "command": "csharpWorkbench.selectSolution",
+        "title": "%command.selectSolution.title%",
+        "category": "C# Workbench",
+        "icon": "$(list-selection)"
+      },
+      {
+        "command": "csharpWorkbench.refresh",
+        "title": "%command.refresh.title%",
+        "category": "C# Workbench",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "csharpWorkbench.toggleShowAllFiles",
+        "title": "%command.showAllFiles.title%",
+        "category": "C# Workbench",
+        "icon": "$(eye-closed)"
+      },
+      {
+        "command": "csharpWorkbench.hideAllFiles",
+        "title": "%command.hideAllFiles.title%",
+        "category": "C# Workbench",
+        "icon": "$(eye)"
       }
     ],
     "menus": {
@@ -58,6 +82,28 @@
         {
           "command": "csharpWorkbench.manageNuget"
         }
+      ],
+      "view/title": [
+        {
+          "command": "csharpWorkbench.selectSolution",
+          "when": "view == csharpWorkbench.solutionExplorer && csharpWorkbench.multipleSolutions",
+          "group": "navigation@1"
+        },
+        {
+          "command": "csharpWorkbench.refresh",
+          "when": "view == csharpWorkbench.solutionExplorer",
+          "group": "navigation@2"
+        },
+        {
+          "command": "csharpWorkbench.toggleShowAllFiles",
+          "when": "view == csharpWorkbench.solutionExplorer && !csharpWorkbench.showAllFiles",
+          "group": "navigation@3"
+        },
+        {
+          "command": "csharpWorkbench.hideAllFiles",
+          "when": "view == csharpWorkbench.solutionExplorer && csharpWorkbench.showAllFiles",
+          "group": "navigation@3"
+        }
       ]
     },
     "configuration": {
@@ -68,9 +114,38 @@
           "default": "",
           "scope": "machine-overridable",
           "markdownDescription": "%config.dotnetPath.description%"
+        },
+        "csharpWorkbench.solutionExplorer.autoReveal": {
+          "type": "boolean",
+          "default": true,
+          "description": "%config.autoReveal.description%"
         }
       }
-    }
+    },
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "csharpWorkbench",
+          "title": "Solution Explorer",
+          "icon": "media/solution-explorer.svg"
+        }
+      ]
+    },
+    "views": {
+      "csharpWorkbench": [
+        {
+          "id": "csharpWorkbench.solutionExplorer",
+          "name": "Solution Explorer"
+        }
+      ]
+    },
+    "viewsWelcome": [
+      {
+        "view": "csharpWorkbench.solutionExplorer",
+        "contents": "%viewsWelcome.noSolution%",
+        "when": "!csharpWorkbench.hasSolution"
+      }
+    ]
   },
   "license": "MIT",
   "icon": "media/icon.png",
