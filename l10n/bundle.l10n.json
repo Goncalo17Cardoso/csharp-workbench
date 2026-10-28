@@ -139,5 +139,14 @@
   "Assembly": "Assembly",
   "Debug": "Debug",
   "Secrets": "Secrets",
-  "The changes to {0} were not saved.": "The changes to {0} were not saved."
+  "The changes to {0} were not saved.": "The changes to {0} were not saved.",
+  "Reload": "Reload",
+  "Reset": "Reset",
+  "inherited": "inherited",
+  "duplicate": "duplicate",
+  "set per configuration": "set per configuration",
+  "Open in .csproj": "Open in .csproj",
+  "The project changed on disk.": "The project changed on disk.",
+  "Debug profiles are not available yet.": "Debug profiles are not available yet.",
+  "Manage user secrets": "Manage user secrets"
 }

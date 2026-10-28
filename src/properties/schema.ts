@@ -1,6 +1,6 @@
 // Field list of the Project Properties page (spec §2.1). Pure: validators return an l10n
 // key (the English message) or undefined; the adapter translates it.
-import { toIdentifier } from '../solution/naming';
+import { toIdentifier } from '../solution/identifier';
 
 export type FieldKind = 'text' | 'bool' | 'choice' | 'tfms' | 'list'; // list = ';'-separated
 export type SectionId = 'application' | 'build' | 'package' | 'assembly' | 'debug' | 'secrets';

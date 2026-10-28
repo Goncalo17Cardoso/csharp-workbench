@@ -13,11 +13,16 @@ export interface ControllerDeps extends PropertiesDeps {
 }
 
 const SECTIONS = ['Application', 'Build', 'Package', 'Assembly', 'Debug', 'Secrets'];
+const UI = [
+  'Save', 'Add', 'Reload', 'Reset', 'inherited', 'duplicate', 'set per configuration', 'Open in .csproj',
+  'The project could not be evaluated, so it is read-only.', 'The project changed on disk.',
+  'Debug profiles are not available yet.', 'Manage user secrets',
+];
 
 /** English keys of every label the webview shows (field labels, sections, validator messages). */
 export function labelKeys(): string[] {
   const messages = [validateTfm('x'), validateVersion('x'), validateIdentifierPath('')];
-  return [...new Set([...FIELDS.map((f) => f.label), ...SECTIONS, ...messages.filter((m): m is string => !!m)])];
+  return [...new Set([...FIELDS.map((f) => f.label), ...SECTIONS, ...UI, ...messages.filter((m): m is string => !!m)])];
 }
 
 const msg = (e: unknown): string => (e instanceof Error ? e.message : String(e));
