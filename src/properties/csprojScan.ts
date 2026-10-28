@@ -66,6 +66,25 @@ function tagEnd(xml: string, from: number): number {
   return xml.length;
 }
 
+/** Find `</name>` from `from`, skipping comments and CDATA. */
+function findClose(xml: string, from: number, name: string): { start: number; end: number } {
+  let i = from;
+  while (i < xml.length) {
+    const lt = xml.indexOf('<', i);
+    if (lt < 0) break;
+    if (xml.startsWith('<!--', lt)) { const e = xml.indexOf('-->', lt + 4); i = e < 0 ? xml.length : e + 3; continue; }
+    if (xml.startsWith('<![CDATA[', lt)) { const e = xml.indexOf(']]>', lt + 9); i = e < 0 ? xml.length : e + 3; continue; }
+    if (xml[lt + 1] === '/') {
+      const e = tagEnd(xml, lt);
+      if (xml.slice(lt + 2, e - 1).trim() === name) return { start: lt, end: e };
+      i = e;
+      continue;
+    }
+    i = lt + 1;
+  }
+  return { start: xml.length, end: xml.length };
+}
+
 function lineIndent(xml: string, pos: number): string {
   const ls = xml.lastIndexOf('\n', pos - 1) + 1;
   const m = /^[ \t]*/.exec(xml.slice(ls, pos));
@@ -81,7 +100,7 @@ export function scanCsproj(xml: string): CsprojScan {
   const eol: '\n' | '\r\n' = nl > 0 && xml[nl - 1] === '\r' ? '\r\n' : '\n';
 
   const stack: string[] = [];
-  let curGroup: { index: number; conditional: boolean } | undefined;
+  let curGroup: CsprojGroup | undefined;
   let i = 0;
   while (i < xml.length) {
     const lt = xml.indexOf('<', i);
@@ -94,8 +113,8 @@ export function scanCsproj(xml: string): CsprojScan {
       const end = tagEnd(xml, lt);
       const name = xml.slice(lt + 2, end - 1).trim();
       const idx = stack.lastIndexOf(name);
+      if (name === 'PropertyGroup' && curGroup && stack[stack.length - 1] === 'PropertyGroup') { curGroup.closeStart = lt; curGroup = undefined; }
       if (idx >= 0) stack.length = idx;
-      if (name === 'PropertyGroup') curGroup = undefined;
       i = end;
       continue;
     }
@@ -113,11 +132,9 @@ export function scanCsproj(xml: string): CsprojScan {
       // Direct child of a property group: a property element.
       let valueStart = end, valueEnd = end, elEnd = end;
       if (!selfClosing) {
-        const close = new RegExp(`</${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*>`, 'g');
-        close.lastIndex = end;
-        const m = close.exec(xml);
-        valueEnd = m ? m.index : xml.length;
-        elEnd = m ? m.index + m[0].length : xml.length;
+        const found = findClose(xml, end, name);
+        valueEnd = found.start;
+        elEnd = found.end;
       }
       const rawValue = xml.slice(valueStart, valueEnd);
       if (!firstChildIndent.has(curGroup.index)) firstChildIndent.set(curGroup.index, lineIndent(xml, lt));
@@ -147,16 +164,6 @@ export function scanCsproj(xml: string): CsprojScan {
     }
     if (!selfClosing) stack.push(name);
     i = end;
-  }
-
-  // Fill closeStart by re-locating each group's close tag after its last child / openEnd.
-  for (const g of groups) {
-    const re = /<\/PropertyGroup\s*>/g;
-    re.lastIndex = g.openEnd;
-    const last = [...occurrences].reverse().find((o) => o.groupIndex === g.index);
-    if (last) re.lastIndex = last.end;
-    const m = re.exec(xml);
-    g.closeStart = m ? m.index : xml.length;
   }
 
   // Indent unit: first group that has children with a childIndent extending its indent.

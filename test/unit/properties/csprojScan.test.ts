@@ -105,4 +105,32 @@ describe('scanCsproj', () => {
     const empty = wrap(`<PropertyGroup>\n</PropertyGroup>`);
     expect(scanCsproj(empty).groups[0]).toMatchObject({ indent: '', childIndent: '  ' });
   });
+
+  it('does not take closeStart from a comment containing </PropertyGroup>', () => {
+    const xml = wrap(`  <PropertyGroup>\n    <A>1</A>\n    <!-- </PropertyGroup> -->\n  </PropertyGroup>`);
+    const g = scanCsproj(xml).groups[0];
+    expect(g.closeStart).toBe(xml.lastIndexOf('</PropertyGroup>'));
+  });
+
+  it('does not truncate a value at </Name> inside a comment or CDATA', () => {
+    const xml = wrap(`  <PropertyGroup>\n    <A>x<!-- </A> -->y</A>\n    <B><![CDATA[</B>]]></B>\n  </PropertyGroup>`);
+    const [a, b] = scanCsproj(xml).occurrences;
+    expect(xml.slice(a.start, a.end)).toBe('<A>x<!-- </A> -->y</A>');
+    expect(xml.slice(b.start, b.end)).toBe('<B><![CDATA[</B>]]></B>');
+    expect(b.value).toBe('</B>');
+  });
+
+  it('handles > inside attribute values, PIs and Target groups', () => {
+    const xml = wrap(`  <?foo </PropertyGroup> ?>\n  <PropertyGroup Condition="'$(A)' > '1'">\n    <A>1</A>\n  </PropertyGroup>\n  <Target Name="T">\n    <PropertyGroup>\n      <Z>1</Z>\n    </PropertyGroup>\n  </Target>`);
+    const s = scanCsproj(xml);
+    expect(s.groups).toHaveLength(1);
+    expect(s.groups[0].conditional).toBe(true);
+    expect(s.occurrences.map((o) => o.name)).toEqual(['A']);
+  });
+
+  it('gives exact value offsets in CRLF files', () => {
+    const xml = wrap(`  <PropertyGroup>\r\n    <A>1</A>\r\n  </PropertyGroup>`, '\r\n');
+    const o = scanCsproj(xml).occurrences[0];
+    expect(xml.slice(o.valueStart, o.valueEnd)).toBe('1');
+  });
 });
