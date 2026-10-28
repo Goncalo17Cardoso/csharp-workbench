@@ -11,6 +11,7 @@ import { createOutput } from './output';
 import { PanelManager, type PanelTestHooks } from './panel/PanelManager';
 import type { ToHost } from './panel/protocol';
 import { registerFileCommands } from './solution/commands/fileCommands';
+import { registerRunCommands } from './solution/commands/run';
 import { registerSolutionCommands } from './solution/commands/solution';
 import { setConfirmOverride } from './solution/confirm';
 import { SolutionTreeProvider } from './solution/SolutionTreeProvider';
@@ -144,6 +145,13 @@ export function activate(context: vscode.ExtensionContext): ExtensionApi | undef
     ws: context.workspaceState,
     getCli: async () => { const d = await resolveDotnet(); return d ? new DotnetCli(nodeExec, d, output) : undefined; },
     showOutput: () => channel.show(true),
+  }));
+
+  context.subscriptions.push(...registerRunCommands({
+    provider: explorer,
+    ws: context.workspaceState,
+    getCli: async () => { const d = await resolveDotnet(); return d ? new DotnetCli(nodeExec, d, output) : undefined; },
+    resolveDotnet,
   }));
 
   context.subscriptions.push(

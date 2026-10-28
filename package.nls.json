@@ -33,5 +33,16 @@
   "command.manageNugetForSolution.title": "Manage NuGet Packages for Solution…",
   "command.addNugetPackage.title": "NuGet Package…",
   "command.updatePackage.title": "Update Package…",
-  "command.removePackage.title": "Remove"
+  "command.removePackage.title": "Remove",
+  "command.build.title": "Build",
+  "command.rebuild.title": "Rebuild",
+  "command.clean.title": "Clean",
+  "command.run.title": "Run",
+  "command.debug.title": "Debug",
+  "command.setStartupProject.title": "Set as Startup Project",
+  "command.runStartup.title": "Run Startup Project",
+  "command.debugStartup.title": "Debug Startup Project",
+  "command.buildSolution.title": "Build Solution",
+  "command.rebuildSolution.title": "Rebuild Solution",
+  "command.cleanSolution.title": "Clean Solution"
 }

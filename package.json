@@ -198,6 +198,63 @@
         "command": "csharpWorkbench.removePackage",
         "title": "%command.removePackage.title%",
         "category": "C# Workbench"
+      },
+      {
+        "command": "csharpWorkbench.build",
+        "title": "%command.build.title%",
+        "category": "C# Workbench"
+      },
+      {
+        "command": "csharpWorkbench.rebuild",
+        "title": "%command.rebuild.title%",
+        "category": "C# Workbench"
+      },
+      {
+        "command": "csharpWorkbench.clean",
+        "title": "%command.clean.title%",
+        "category": "C# Workbench"
+      },
+      {
+        "command": "csharpWorkbench.run",
+        "title": "%command.run.title%",
+        "category": "C# Workbench"
+      },
+      {
+        "command": "csharpWorkbench.debug",
+        "title": "%command.debug.title%",
+        "category": "C# Workbench"
+      },
+      {
+        "command": "csharpWorkbench.setStartupProject",
+        "title": "%command.setStartupProject.title%",
+        "category": "C# Workbench"
+      },
+      {
+        "command": "csharpWorkbench.runStartup",
+        "title": "%command.runStartup.title%",
+        "category": "C# Workbench",
+        "icon": "$(play)"
+      },
+      {
+        "command": "csharpWorkbench.debugStartup",
+        "title": "%command.debugStartup.title%",
+        "category": "C# Workbench",
+        "icon": "$(debug-alt)"
+      },
+      {
+        "command": "csharpWorkbench.buildSolution",
+        "title": "%command.buildSolution.title%",
+        "category": "C# Workbench"
+      },
+      {
+        "command": "csharpWorkbench.rebuildSolution",
+        "title": "%command.rebuildSolution.title%",
+        "category": "C# Workbench"
+      },
+      {
+        "command": "csharpWorkbench.cleanSolution",
+        "title": "%command.cleanSolution.title%",
+        "category": "C# Workbench"
       }
     ],
     "menus": {
@@ -315,6 +372,42 @@
         {
           "command": "csharpWorkbench.removePackage",
           "when": "false"
+        },
+        {
+          "command": "csharpWorkbench.build",
+          "when": "false"
+        },
+        {
+          "command": "csharpWorkbench.rebuild",
+          "when": "false"
+        },
+        {
+          "command": "csharpWorkbench.clean",
+          "when": "false"
+        },
+        {
+          "command": "csharpWorkbench.run",
+          "when": "false"
+        },
+        {
+          "command": "csharpWorkbench.debug",
+          "when": "false"
+        },
+        {
+          "command": "csharpWorkbench.setStartupProject",
+          "when": "false"
+        },
+        {
+          "command": "csharpWorkbench.buildSolution",
+          "when": "false"
+        },
+        {
+          "command": "csharpWorkbench.rebuildSolution",
+          "when": "false"
+        },
+        {
+          "command": "csharpWorkbench.cleanSolution",
+          "when": "false"
         }
       ],
       "view/title": [
@@ -337,6 +430,16 @@
           "command": "csharpWorkbench.hideAllFiles",
           "when": "view == csharpWorkbench.solutionExplorer && csharpWorkbench.showAllFiles",
           "group": "navigation@3"
+        },
+        {
+          "command": "csharpWorkbench.runStartup",
+          "when": "view == csharpWorkbench.solutionExplorer && csharpWorkbench.hasSolution",
+          "group": "navigation@0"
+        },
+        {
+          "command": "csharpWorkbench.debugStartup",
+          "when": "view == csharpWorkbench.solutionExplorer && csharpWorkbench.hasSolution",
+          "group": "navigation@0.5"
         }
       ],
       "view/item/context": [
@@ -439,6 +542,51 @@
           "command": "csharpWorkbench.removeSolutionFolder",
           "when": "viewItem =~ /^cw\\.solutionFolder$/",
           "group": "7_remove@1"
+        },
+        {
+          "command": "csharpWorkbench.build",
+          "when": "viewItem =~ /^cw\\.project(\\.|$)/",
+          "group": "2_build@0"
+        },
+        {
+          "command": "csharpWorkbench.rebuild",
+          "when": "viewItem =~ /^cw\\.project(\\.|$)/",
+          "group": "2_build@1"
+        },
+        {
+          "command": "csharpWorkbench.clean",
+          "when": "viewItem =~ /^cw\\.project(\\.|$)/",
+          "group": "2_build@2"
+        },
+        {
+          "command": "csharpWorkbench.run",
+          "when": "viewItem =~ /^cw\\.project(\\.|$)/",
+          "group": "3_run@0"
+        },
+        {
+          "command": "csharpWorkbench.debug",
+          "when": "viewItem =~ /^cw\\.project(\\.|$)/",
+          "group": "3_run@1"
+        },
+        {
+          "command": "csharpWorkbench.setStartupProject",
+          "when": "viewItem =~ /^cw\\.project$/",
+          "group": "3_run@2"
+        },
+        {
+          "command": "csharpWorkbench.buildSolution",
+          "when": "viewItem =~ /^cw\\.solution$/",
+          "group": "2_build@0"
+        },
+        {
+          "command": "csharpWorkbench.rebuildSolution",
+          "when": "viewItem =~ /^cw\\.solution$/",
+          "group": "2_build@1"
+        },
+        {
+          "command": "csharpWorkbench.cleanSolution",
+          "when": "viewItem =~ /^cw\\.solution$/",
+          "group": "2_build@2"
         }
       ],
       "csharpWorkbench.add": [

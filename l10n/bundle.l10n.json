@@ -74,5 +74,11 @@
   "Remove {0} packages?": "Remove {0} packages?",
   "These projects are removed from the solution (files stay on disk):\n{0}": "These projects are removed from the solution (files stay on disk):\n{0}",
   "Rename failed at step {0} of {1} ({2} {3}): {4}": "Rename failed at step {0} of {1} ({2} {3}): {4}",
-  "The solution may be partially updated; check it and re-add the project if needed.": "The solution may be partially updated; check it and re-add the project if needed."
+  "The solution may be partially updated; check it and re-add the project if needed.": "The solution may be partially updated; check it and re-add the project if needed.",
+  "Select the startup project": "Select the startup project",
+  "Could not determine the output path of {0}.": "Could not determine the output path of {0}.",
+  "Install C# extension": "Install C# extension",
+  "Debugging needs the C# extension (ms-dotnettools.csharp).": "Debugging needs the C# extension (ms-dotnettools.csharp).",
+  "Run": "Run",
+  "The .NET debugger is not available in this editor. Use Run instead.": "The .NET debugger is not available in this editor. Use Run instead."
 }

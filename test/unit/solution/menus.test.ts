@@ -25,3 +25,15 @@ describe('file-operation menu scopes', () => {
     for (const v of ['cw.project', 'cw.project.startup', 'cw.folder']) expect(regexOf(add.when!).test(v)).toBe(true);
   });
 });
+
+describe('run menus', () => {
+  const ctx = menus['view/item/context'];
+  it('start-up item is hidden on the startup project, others match both', () => {
+    const set = ctx.find((m) => m.command === 'csharpWorkbench.setStartupProject')!;
+    expect(regexOf(set.when!).test('cw.project')).toBe(true);
+    expect(regexOf(set.when!).test('cw.project.startup')).toBe(false);
+    const build = ctx.find((m) => m.command === 'csharpWorkbench.build')!;
+    expect(regexOf(build.when!).test('cw.project.startup')).toBe(true);
+    expect(regexOf(build.when!).test('cw.projectRef')).toBe(false);
+  });
+});
