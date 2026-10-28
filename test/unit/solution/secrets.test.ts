@@ -9,8 +9,8 @@ function fakes(opts: { ids: Array<string | undefined>; exists?: boolean }) {
     readProject: async () => opts.ids[Math.min(reads++, opts.ids.length - 1)],
     init: async (p: string) => { calls.push(`init:${p}`); },
     exists: async () => opts.exists ?? false,
-    mkdirp: async (d: string) => { calls.push(`mkdir:${d}`); },
-    writeFile: async (p: string, s: string) => { written[p] = s; },
+    mkdirp: async (d: string, mode: number) => { calls.push(`mkdir:${d}:${mode.toString(8)}`); },
+    writeFile: async (p: string, s: string, mode: number) => { written[p] = s; calls.push(`mode:${mode.toString(8)}`); },
   };
   return { deps, calls, written };
 }
@@ -36,7 +36,7 @@ describe('ensureSecrets', () => {
   it('creates {} file when missing', async () => {
     const f = fakes({ ids: ['abc'] });
     const p = await ensureSecrets('/p/a.csproj', f.deps, '/home/u');
-    expect(f.calls).toEqual(['mkdir:/home/u/.microsoft/usersecrets/abc']);
+    expect(f.calls).toEqual(['mkdir:/home/u/.microsoft/usersecrets/abc:700', 'mode:600']);
     expect(f.written[p]).toBe('{}\n');
   });
   it('never overwrites an existing file', async () => {
@@ -47,5 +47,10 @@ describe('ensureSecrets', () => {
   it('throws when init did not add the id', async () => {
     const f = fakes({ ids: [undefined] });
     await expect(ensureSecrets('/p/a.csproj', f.deps, '/h')).rejects.toThrow('UserSecretsId was not added to the project.');
+  });
+  it.each(['../../x', 'a/b', 'a\\b', 'a\0b'])('rejects hostile id %j', async (id) => {
+    const f = fakes({ ids: [id] });
+    await expect(ensureSecrets('/p/a.csproj', f.deps, '/h')).rejects.toThrow('Invalid UserSecretsId');
+    expect(f.calls).toEqual([]);
   });
 });

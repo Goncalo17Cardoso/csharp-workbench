@@ -484,12 +484,12 @@
         },
         {
           "command": "csharpWorkbench.revealInFinder",
-          "when": "viewItem =~ /^cw\\.(file|folder|project(\\.|$))/",
+          "when": "viewItem =~ /^cw\\.(file|folder|solution$|project(\\.|$))/",
           "group": "5_os@1"
         },
         {
           "command": "csharpWorkbench.openInTerminal",
-          "when": "viewItem =~ /^cw\\.(file|folder|project(\\.|$))/",
+          "when": "viewItem =~ /^cw\\.(file|folder|solution$|project(\\.|$))/",
           "group": "5_os@2"
         },
         {

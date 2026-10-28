@@ -92,4 +92,11 @@ describe('task 11 final menus', () => {
     expect(shown.sort()).toEqual(['csharpWorkbench.manageNuget']);
     expect(menus.commandPalette.some((m) => m.command === 'csharpWorkbench.manageUserSecrets' && m.when === 'false')).toBe(true);
   });
+  it('os items cover solution but not solution folders', () => {
+    for (const c of ['revealInFinder', 'openInTerminal']) {
+      const re = regexOf(ctx.find((x) => x.command === `csharpWorkbench.${c}`)!.when!);
+      expect(re.test('cw.solution'), c).toBe(true);
+      expect(re.test('cw.solutionFolder'), c).toBe(false);
+    }
+  });
 });

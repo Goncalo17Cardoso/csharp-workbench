@@ -51,7 +51,7 @@ export function registerFileCommands(deps: Deps): vscode.Disposable[] {
   let catalog: TemplateCatalog | undefined;
 
   const selection = (node?: TreeNode, nodes?: TreeNode[]) => (nodes?.length ? nodes : node ? [node] : []);
-  const folderOf = (n: TreeNode) => n.kind === 'file' ? path.dirname(n.path!) : n.kind === 'project' ? path.dirname(n.path!) : n.path!;
+  const folderOf = (n: TreeNode) => n.kind === 'file' ? path.dirname(n.path!) : n.kind === 'project' || n.kind === 'solution' ? path.dirname(n.path!) : n.path!;
   const projectOf = (p: string) => core.projectForPath(p);
   const fail = (e: unknown) => void vscode.window.showErrorMessage(errText(e));
   const touch = (p: string) => provider.invalidatePath(p);

@@ -81,5 +81,6 @@
   "Debugging needs the C# extension (ms-dotnettools.csharp).": "Debugging needs the C# extension (ms-dotnettools.csharp).",
   "Run": "Run",
   "The .NET debugger is not available in this editor. Use Run instead.": "The .NET debugger is not available in this editor. Use Run instead.",
-  "Could not manage user secrets: {0}": "Could not manage user secrets: {0}"
+  "Could not manage user secrets: {0}": "Could not manage user secrets: {0}",
+  "Invalid UserSecretsId: {0}": "Invalid UserSecretsId: {0}"
 }

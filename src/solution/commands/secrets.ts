@@ -19,12 +19,16 @@ export function registerSecretsCommands(deps: Deps): vscode.Disposable[] {
         readProject: async (p) => readProjectInfo(p, await fsp.readFile(p, 'utf8')).userSecretsId,
         init: (p) => cli.userSecretsInit(p),
         exists: async (p) => fsp.access(p).then(() => true, () => false),
-        mkdirp: async (d) => void (await fsp.mkdir(d, { recursive: true })),
-        writeFile: (p, s) => fsp.writeFile(p, s, 'utf8'),
+        mkdirp: async (d, mode) => void (await fsp.mkdir(d, { recursive: true, mode })),
+        writeFile: (p, s, mode) => fsp.writeFile(p, s, { encoding: 'utf8', mode, flag: 'wx' }),
       }, os.homedir());
       await vscode.window.showTextDocument(vscode.Uri.file(file));
     } catch (e) {
-      void vscode.window.showErrorMessage(vscode.l10n.t('Could not manage user secrets: {0}', e instanceof Error ? e.message : String(e)));
+      const m = e instanceof Error ? e.message : String(e);
+      const bad = /^Invalid UserSecretsId: (.*)$/s.exec(m);
+      void vscode.window.showErrorMessage(bad
+        ? vscode.l10n.t('Invalid UserSecretsId: {0}', bad[1])
+        : vscode.l10n.t('Could not manage user secrets: {0}', m));
     }
   })];
 }

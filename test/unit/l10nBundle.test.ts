@@ -26,6 +26,8 @@ describe('l10n bundle covers src', () => {
       .flatMap((e) => (e.isDirectory() ? walk(join(d, e.name)) : e.name.endsWith('.ts') ? [join(d, e.name)] : []));
     const found = walk('src').flatMap((f) =>
       [...read(f).matchAll(/l10n\.t\(\s*'((?:[^'\\]|\\.)*)'/g)].map((m) => m[1].replace(/\\(.)/g, (_x, c: string) => (c === 'n' ? '\n' : c))));
+    const bad = walk('src').flatMap((f) => [...read(f).matchAll(/l10n\.t\(\s*(?!'|message\b)/g)].map(() => f));
+    expect(bad, 'l10n.t must be called with a single-quoted literal').toEqual([]);
     expect(found.length).toBeGreaterThan(20);
     expect(found.filter((m) => !(m in bundle))).toEqual([]);
   });

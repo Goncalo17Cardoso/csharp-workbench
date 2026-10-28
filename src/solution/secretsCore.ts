@@ -5,12 +5,18 @@ export interface SecretsDeps {
   readProject(project: string): Promise<string | undefined>;
   init(project: string): Promise<void>;
   exists(p: string): Promise<boolean>;
-  mkdirp(dir: string): Promise<void>;
-  writeFile(p: string, content: string): Promise<void>;
+  mkdirp(dir: string, mode: number): Promise<void>;
+  /** Must fail if the file already exists (exclusive create). */
+  writeFile(p: string, content: string, mode: number): Promise<void>;
 }
 
-export const secretsPath = (home: string, id: string): string =>
-  path.join(home, '.microsoft', 'usersecrets', id, 'secrets.json');
+export const secretsPath = (home: string, id: string): string => {
+  if (!id || /[\\/\0]|\.\./.test(id)) throw new Error(`Invalid UserSecretsId: ${id}`);
+  const root = path.join(home, '.microsoft', 'usersecrets');
+  const file = path.join(root, id, 'secrets.json');
+  if (!file.startsWith(root + path.sep)) throw new Error(`Invalid UserSecretsId: ${id}`);
+  return file;
+};
 
 /** Makes sure the project has a UserSecretsId and its secrets.json exists; returns the file path. */
 export async function ensureSecrets(project: string, deps: SecretsDeps, home: string): Promise<string> {
@@ -22,8 +28,8 @@ export async function ensureSecrets(project: string, deps: SecretsDeps, home: st
   }
   const file = secretsPath(home, id);
   if (!(await deps.exists(file))) {
-    await deps.mkdirp(path.dirname(file));
-    await deps.writeFile(file, '{}\n');
+    await deps.mkdirp(path.dirname(file), 0o700);
+    await deps.writeFile(file, '{}\n', 0o600);
   }
   return file;
 }
