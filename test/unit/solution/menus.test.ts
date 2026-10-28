@@ -37,3 +37,25 @@ describe('run menus', () => {
     expect(regexOf(build.when!).test('cw.projectRef')).toBe(false);
   });
 });
+
+describe('task 10 menu scopes', () => {
+  const RUN = /^csharpWorkbench\.(build|rebuild|clean|run|debug|setStartupProject|buildSolution|rebuildSolution|cleanSolution)$/;
+  const items = menus['view/item/context'].filter((m) => RUN.test(m.command ?? ''));
+  it('covers every item', () => expect(items.length).toBe(9));
+  it('never matches refs or solution folders', () => {
+    for (const m of items) for (const v of ['cw.projectRef', 'cw.projectRefs', 'cw.solutionFolder'])
+      expect(regexOf(m.when!).test(v), `${m.command} ${v}`).toBe(false);
+  });
+  it('project items match project and startup project', () => {
+    for (const m of items.filter((i) => !/Solution$/.test(i.command!))) {
+      expect(regexOf(m.when!).test('cw.project'), m.command).toBe(true);
+      expect(regexOf(m.when!).test('cw.project.startup'), m.command).toBe(m.command !== 'csharpWorkbench.setStartupProject');
+    }
+  });
+  it('solution items match only the solution', () => {
+    for (const m of items.filter((i) => /Solution$/.test(i.command!))) {
+      expect(regexOf(m.when!).test('cw.solution')).toBe(true);
+      expect(regexOf(m.when!).test('cw.project')).toBe(false);
+    }
+  });
+});

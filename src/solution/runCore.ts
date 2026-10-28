@@ -14,7 +14,7 @@ export function dotnetTask(kind: TaskKind, target: string, _dotnet: string, tfm?
     case 'build': return { name: `Build ${label}`, args: ['build', target, ...f] };
     case 'rebuild': return { name: `Rebuild ${label}`, args: ['build', target, '--no-incremental', ...f] };
     case 'clean': return { name: `Clean ${label}`, args: ['clean', target] };
-    case 'run': return { name: `Run ${label}`, args: ['run', '--project', target] };
+    case 'run': return { name: `Run ${label}`, args: ['run', '--project', target, ...f] };
   }
 }
 
@@ -32,3 +32,6 @@ export function targetPathStep(output: string, tfms: readonly string[]):
   if (lines.length === 1) return { kind: 'path', path: lines[0] };
   return tfms.length ? { kind: 'retry', tfm: tfms[0] } : { kind: 'fail' };
 }
+
+/** `dotnet run` needs an explicit framework only for multi-target projects: the first one. */
+export const runTfm = (tfms: readonly string[]): string | undefined => (tfms.length > 1 ? tfms[0] : undefined);

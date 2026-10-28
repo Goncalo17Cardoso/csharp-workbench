@@ -4,7 +4,7 @@ import * as vscode from 'vscode';
 import type { DotnetCli } from '../../dotnet/cli';
 import type { TreeNode } from '../model';
 import { readProjectInfo } from '../projectInfo';
-import { debugConfigFor, dotnetTask, targetPathStep, type TaskKind } from '../runCore';
+import { debugConfigFor, dotnetTask, runTfm, targetPathStep, type TaskKind } from '../runCore';
 import { loadSolution } from '../slnParse';
 import type { SolutionTreeProvider } from '../SolutionTreeProvider';
 import { getStartupProject, setStartupProject } from '../state';
@@ -40,12 +40,16 @@ export function registerRunCommands(deps: Deps): vscode.Disposable[] {
     if (kind !== 'run') task.group = vscode.TaskGroup.Build;
     if (!wait) { await vscode.tasks.executeTask(task); return 0; }
     let exec: vscode.TaskExecution | undefined;
-    const early: vscode.TaskProcessEndEvent[] = [];
+    const early: Array<{ execution: vscode.TaskExecution; exitCode: number | undefined }> = [];
     let done: (code: number | undefined) => void = () => undefined;
     const result = new Promise<number | undefined>((r) => { done = r; });
-    const sub = vscode.tasks.onDidEndTaskProcess((e) => {
-      if (!exec) early.push(e); else if (e.execution === exec) done(e.exitCode);
-    });
+    // Whichever of process-end / task-end fires first wins; a task that ends without a process resolves undefined.
+    const onEnd = (execution: vscode.TaskExecution, exitCode: number | undefined) => {
+      if (!exec) early.push({ execution, exitCode }); else if (execution === exec) done(exitCode);
+    };
+    const sub1 = vscode.tasks.onDidEndTaskProcess((e) => onEnd(e.execution, e.exitCode));
+    const sub2 = vscode.tasks.onDidEndTask((e) => onEnd(e.execution, undefined));
+    const sub = { dispose: () => { sub1.dispose(); sub2.dispose(); } };
     try {
       exec = await vscode.tasks.executeTask(task);
       const hit = early.find((e) => e.execution === exec);
@@ -59,10 +63,11 @@ export function registerRunCommands(deps: Deps): vscode.Disposable[] {
   async function pickStartup(): Promise<string | undefined> {
     const sln = solutionPath();
     if (!sln) { void vscode.window.showInformationMessage(vscode.l10n.t('No solution is open.')); return undefined; }
-    const cur = getStartupProject(ws, sln);
-    if (cur) return cur;
     let model;
     try { model = await loadSolution(sln, readText); } catch (e) { fail(e); return undefined; }
+    const cur = getStartupProject(ws, sln);
+    if (cur && model.projects.some((p) => p.path === cur)) return cur;
+    if (cur) await setStartupProject(ws, sln, undefined);
     const pick = await vscode.window.showQuickPick(
       model.projects.map((p) => ({ label: p.name, description: vscode.workspace.asRelativePath(p.path), path: p.path })),
       { placeHolder: vscode.l10n.t('Select the startup project') },
@@ -97,7 +102,10 @@ export function registerRunCommands(deps: Deps): vscode.Disposable[] {
 
   async function runProject(project: string | undefined): Promise<void> {
     if (!project) return;
-    try { await runTask('run', project, false); } catch (e) { fail(e); }
+    try {
+      const tfm = runTfm(await tfmsOf(project));
+      await runTask('run', project, false, tfm);
+    } catch (e) { fail(e); }
   }
 
   async function debugProject(project: string | undefined): Promise<void> {

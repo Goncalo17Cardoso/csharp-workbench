@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { DotnetCli } from '../../../src/dotnet/cli';
 import type { Exec } from '../../../src/dotnet/exec';
-import { debugConfigFor, dotnetTask, targetPathStep } from '../../../src/solution/runCore';
+import { debugConfigFor, dotnetTask, runTfm, targetPathStep } from '../../../src/solution/runCore';
 
 describe('dotnetTask', () => {
   it('build', () => expect(dotnetTask('build', '/s/Api/MyApp.Api.csproj', 'dotnet'))
@@ -36,5 +36,15 @@ describe('targetPathStep', () => {
     const cli = new DotnetCli(exec as unknown as Exec, 'dotnet', { log: vi.fn(), info: vi.fn() });
     await cli.getProperty('/s/A.csproj', 'TargetPath', { TargetFramework: 'net8.0' });
     expect(exec.mock.calls[0][1]).toEqual(['msbuild', '/s/A.csproj', '-getProperty:TargetPath', '-p:TargetFramework=net8.0']);
+  });
+});
+
+describe('run on multi-target', () => {
+  it('run with tfm adds -f', () => expect(dotnetTask('run', '/s/A.csproj', 'dotnet', 'net8.0').args)
+    .toEqual(['run', '--project', '/s/A.csproj', '-f', 'net8.0']));
+  it('runTfm: single -> undefined, multi -> first', () => {
+    expect(runTfm(['net8.0'])).toBeUndefined();
+    expect(runTfm([])).toBeUndefined();
+    expect(runTfm(['net8.0', 'net9.0'])).toBe('net8.0');
   });
 });
