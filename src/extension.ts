@@ -11,6 +11,7 @@ import { createOutput } from './output';
 import { PanelManager, type PanelTestHooks } from './panel/PanelManager';
 import type { ToHost } from './panel/protocol';
 import { registerPropertiesCommands } from './properties/commands';
+import { registerSyncCommands } from './sync/command';
 import { registerFileCommands } from './solution/commands/fileCommands';
 import { registerRunCommands } from './solution/commands/run';
 import { registerSecretsCommands } from './solution/commands/secrets';
@@ -24,6 +25,8 @@ import { selectTargets } from './workspace/targets';
 export interface ExtensionApi extends PanelTestHooks {
   send(targetPath: string, msg: ToHost): Promise<void>;
   /** Solution Explorer hooks (Test mode only). `run` executes `csharpWorkbench.<command>`. */
+  /** Test mode only: Sync Namespaces applies without the refactor preview. */
+  syncSkipConfirmation?: boolean;
   solution?: { core: SolutionTreeCore; run(command: string, ...args: unknown[]): Promise<unknown> };
 }
 
@@ -174,6 +177,13 @@ export function activate(context: vscode.ExtensionContext): ExtensionApi | undef
     extensionUri: context.extensionUri,
     provider: explorer,
     getCli: async () => { const d = await resolveDotnet(); return d ? new DotnetCli(nodeExec, d, output) : undefined; },
+  }));
+
+  context.subscriptions.push(...registerSyncCommands({
+    provider: explorer,
+    output,
+    getCli: async () => { const d = await resolveDotnet(); return d ? new DotnetCli(nodeExec, d, output) : undefined; },
+    skipConfirmation: () => api?.syncSkipConfirmation === true,
   }));
 
   context.subscriptions.push(

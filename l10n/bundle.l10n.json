@@ -180,5 +180,11 @@
   "(active)": "(active)",
   "not supported on this system": "not supported on this system",
   "Select a launch profile": "Select a launch profile",
-  "The launch profile has no executable path.": "The launch profile has no executable path."
+  "The launch profile has no executable path.": "The launch profile has no executable path.",
+  "Namespaces are already in sync.": "Namespaces are already in sync.",
+  "Synchronizing namespaces": "Synchronizing namespaces",
+  "Namespace declaration": "Namespace declaration",
+  "Using directive": "Using directive",
+  "Qualified name": "Qualified name",
+  "Namespaces synchronized.": "Namespaces synchronized."
 }

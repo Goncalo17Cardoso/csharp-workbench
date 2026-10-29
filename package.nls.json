@@ -50,5 +50,6 @@
   "views.solutionExplorer.name": "Solution Explorer",
   "command.projectProperties.title": "Properties",
   "command.projectProperties.save.title": "Save Project Properties",
+  "command.syncNamespaces.title": "Sync Namespaces",
   "command.selectLaunchProfile.title": "Select Launch Profile..."
 }

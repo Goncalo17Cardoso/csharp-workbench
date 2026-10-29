@@ -196,6 +196,11 @@
         "category": "C# Workbench"
       },
       {
+        "command": "csharpWorkbench.syncNamespaces",
+        "title": "%command.syncNamespaces.title%",
+        "category": "C# Workbench"
+      },
+      {
         "command": "csharpWorkbench.manageNugetForSolution",
         "title": "%command.manageNugetForSolution.title%",
         "category": "C# Workbench"
@@ -295,6 +300,10 @@
         }
       ],
       "commandPalette": [
+        {
+          "command": "csharpWorkbench.syncNamespaces",
+          "when": "false"
+        },
         {
           "command": "csharpWorkbench.manageNuget"
         },
@@ -639,6 +648,11 @@
           "command": "csharpWorkbench.projectProperties",
           "when": "viewItem =~ /^cw\\.project(\\.|$)/",
           "group": "9_properties@1"
+        },
+        {
+          "command": "csharpWorkbench.syncNamespaces",
+          "when": "viewItem =~ /^cw\\.(project(\\.|$)|solution$)/",
+          "group": "8_sync@1"
         }
       ],
       "csharpWorkbench.add": [

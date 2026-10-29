@@ -65,7 +65,7 @@ describe('task 11 final menus', () => {
   const VALUES = ['cw.solution', 'cw.solutionFolder', 'cw.project', 'cw.project.startup', 'cw.folder', 'cw.file', 'cw.packages', 'cw.package', 'cw.projectRefs', 'cw.projectRef'];
   it('every entry has group@order', () => {
     for (const m of ctx) {
-      const re = m.command === 'csharpWorkbench.projectProperties' ? /^9_properties@1$/ : /^[1-7]_[a-z]+@\d+(\.\d+)?$/;
+      const re = m.command === 'csharpWorkbench.projectProperties' ? /^9_properties@1$/ : m.command === 'csharpWorkbench.syncNamespaces' ? /^8_sync@1$/ : /^[1-7]_[a-z]+@\d+(\.\d+)?$/;
       expect(m.group, m.command ?? m.submenu).toMatch(re);
     }
   });
@@ -134,5 +134,15 @@ describe('project properties menu', () => {
   });
   it('save command is hidden from the palette', () => {
     expect(menus.commandPalette.some((m) => m.command === 'csharpWorkbench.projectProperties.save' && m.when === 'false')).toBe(true);
+  });
+});
+
+describe('sync namespaces menu', () => {
+  const item = menus['view/item/context'].find((m) => m.command === 'csharpWorkbench.syncNamespaces')!;
+  it('Sync Namespaces on cw.project* and cw.solution, not on folders or projectRef', () => {
+    const re = regexOf(item.when!);
+    for (const v of ['cw.solution', 'cw.project', 'cw.project.startup']) expect(re.test(v), v).toBe(true);
+    for (const v of ['cw.solutionFolder', 'cw.folder', 'cw.file', 'cw.projectRef', 'cw.projectRefs', 'cw.projects']) expect(re.test(v), v).toBe(false);
+    expect((item as { group?: string }).group).toBe('8_sync@1');
   });
 });
