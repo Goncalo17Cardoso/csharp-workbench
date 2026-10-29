@@ -1,13 +1,38 @@
 // Pure helpers choosing which files take part in Sync Namespaces. No `vscode` import.
 import * as path from 'node:path';
+import type { SyncInputFile } from './plan';
 
-/** A compile item that belongs to the project: not linked, inside its directory, not under bin/ or obj/. */
-export function isSyncCandidate(projectDir: string, item: { fullPath: string; link?: string }): boolean {
+/**
+ * How a compile item takes part in Sync Namespaces:
+ * - 'excluded': linked, outside the project directory, under bin/ or obj/, or not a .cs file;
+ * - 'generated': a generated file name (*.g.cs, *.g.i.cs, *.Designer.cs);
+ * - 'source': everything else.
+ */
+export type SyncItemRole = 'source' | 'generated' | 'excluded';
+
+export function syncItemRole(projectDir: string, item: { fullPath: string; link?: string }): SyncItemRole {
   const lower = item.fullPath.toLowerCase();
-  if (item.link || !lower.endsWith('.cs') || /\.(g\.i|g|designer)\.cs$/.test(lower)) return false;
+  if (item.link || !lower.endsWith('.cs')) return 'excluded';
   const rel = path.relative(projectDir, item.fullPath);
-  if (!rel || rel.startsWith('..') || path.isAbsolute(rel)) return false;
-  return !rel.split(/[\\/]/).slice(0, -1).some((s) => s === 'bin' || s === 'obj');
+  if (!rel || rel.startsWith('..') || path.isAbsolute(rel)) return 'excluded';
+  if (rel.split(/[\\/]/).slice(0, -1).some((s) => s === 'bin' || s === 'obj')) return 'excluded';
+  return /\.(g\.i|g|designer)\.cs$/.test(lower) ? 'generated' : 'source';
+}
+
+/**
+ * The planner input for a file. Generated files (by name or header) go in with `inScope: false`:
+ * their namespaces and types count as existing and they get reference edits, never a declaration
+ * edit. `generated` is true when the file should be listed as skipped ('generated').
+ */
+export function syncFileInput(role: 'source' | 'generated', file: SyncInputFile): { file: SyncInputFile; generated: boolean } {
+  if (role === 'source' && !hasGeneratedHeader(file.text)) return { file, generated: false };
+  return { file: { ...file, inScope: false }, generated: file.inScope };
+}
+
+/** The evaluated RootNamespace, or the project file name when it is empty or could not be evaluated. */
+export function resolveRootNamespace(projectPath: string, evaluated: string | undefined): string {
+  const v = evaluated?.trim();
+  return v ? v : path.basename(projectPath).replace(/\.csproj$/i, '');
 }
 
 /** True when the first 5 lines carry an auto-generated marker. */

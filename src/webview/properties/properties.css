@@ -10,6 +10,7 @@
 .props-badges { grid-column: 2; display: flex; gap: 8px; align-items: center; }
 .badge { font-size: 0.85em; padding: 0 6px; border-radius: 8px; background: var(--vscode-badge-background); color: var(--vscode-badge-foreground); }
 .badge-warn { background: var(--vscode-inputValidation-warningBackground); color: var(--vscode-foreground); }
+.props-evaluated { grid-column: 2; color: var(--vscode-descriptionForeground); font-size: 0.9em; }
 .props-msg { grid-column: 2; color: var(--vscode-errorForeground); font-size: 0.9em; }
 .props-msg:empty, .props-badges:empty { display: none; }
 .props-chip { display: inline-flex; align-items: center; gap: 4px; margin-right: 6px; padding: 0 6px; border-radius: 8px; background: var(--vscode-badge-background); color: var(--vscode-badge-foreground); }

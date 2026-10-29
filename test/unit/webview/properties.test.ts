@@ -4,6 +4,7 @@ import { renderProperties } from '../../../src/webview/properties/views/form';
 import { FIELDS } from '../../../src/properties/schema';
 import type { FieldState, PropertiesModel } from '../../../src/properties/model';
 import type { PropsToHost } from '../../../src/properties/protocol';
+import { loadProperties, saveProperties, type PropertiesDeps } from '../../../src/properties/model';
 
 function model(over: Record<string, Partial<FieldState>> = {}, extra: Partial<PropertiesModel> = {}): PropertiesModel {
   return {
@@ -114,6 +115,85 @@ describe('properties form', () => {
     expect(root.textContent).toContain('boom');
     for (const c of root.querySelectorAll<HTMLInputElement>('.props-control input, .props-control select')) expect(c.disabled).toBe(true);
     expect(root.querySelector<HTMLButtonElement>('button.primary')!.disabled).toBe(true);
+  });
+
+  it('an unrelated change never emits edits for untouched multi-line values', () => {
+    const { root, api, send } = setup(model({
+      PackageReleaseNotes: { origin: 'project', raw: 'line one\nline two', evaluated: 'line one\nline two' },
+      NoWarn: { origin: 'project', raw: 'CS1591;\r\n      CS0618', evaluated: 'CS1591;\r\n      CS0618' },
+      Version: { origin: 'project', raw: '1.0.0', evaluated: '1.0.0' },
+    }));
+    const v = input(root, 'Version'); v.value = '1.0.1'; fire(v, 'input');
+    expect(api.collectEdits()).toEqual([{ kind: 'set', name: 'Version', value: '1.0.1' }]);
+    expect(last(send)).toEqual({ type: 'dirty', dirty: true, edits: [{ kind: 'set', name: 'Version', value: '1.0.1' }] });
+  });
+
+  it('a multi-line project value is read-only with a badge and Open in .csproj', () => {
+    const { root, send } = setup(model({ PackageReleaseNotes: { origin: 'project', raw: 'a\nb', evaluated: 'a\nb' } }), { 'multi-line': 'várias linhas' });
+    expect(input(root, 'PackageReleaseNotes').disabled).toBe(true);
+    const row = input(root, 'PackageReleaseNotes').closest('.props-field')!;
+    expect(row.textContent).toContain('várias linhas');
+    expect(row.querySelector('.props-reset')).toBeNull();
+    [...row.querySelectorAll<HTMLElement>('a, button')].find((b) => b.textContent === 'Open in .csproj')!.click();
+    expect(send).toHaveBeenCalledWith({ type: 'openCsproj', property: 'PackageReleaseNotes' });
+  });
+
+  it('shows the evaluated value under a project field when it differs from the text', () => {
+    const { root } = setup(model({
+      Version: { origin: 'project', raw: '$(BaseVersion)', evaluated: '2.1.0' },
+      Authors: { origin: 'project', raw: 'me', evaluated: 'me' },
+    }), { 'Evaluated: {0}': 'Avaliado: {0}' });
+    const row = (id: string) => input(root, id).closest('.props-field')!;
+    expect(row('Version').querySelector('.props-evaluated')!.textContent).toBe('Avaliado: 2.1.0');
+    expect(row('Authors').querySelector('.props-evaluated')).toBeNull();
+    expect(input(root, 'Version').value).toBe('$(BaseVersion)');
+  });
+
+  it('read-only after failed evaluation marks project values as not evaluated', () => {
+    const { root } = setup(model({ Version: { origin: 'project', raw: '$(BaseVersion)', evaluated: '' } }, { readOnly: true, error: 'boom' }));
+    const row = input(root, 'Version').closest('.props-field')!;
+    expect(input(root, 'Version').value).toBe('$(BaseVersion)');
+    expect(row.textContent).toContain('from .csproj, not evaluated');
+    expect(row.querySelector('.props-evaluated')).toBeNull();
+    expect(input(root, 'Authors').closest('.props-field')!.textContent).not.toContain('not evaluated');
+  });
+
+  describe('round-trip through the model', () => {
+    const CS = '<Project Sdk="Microsoft.NET.Sdk">\n  <PropertyGroup>\n    <Company>A &amp; B</Company>\n    <Version>1.0.0</Version>\n  </PropertyGroup>\n</Project>\n';
+    const decode = (s: string) => s.replace(/&amp;/g, '&');
+    function deps(disk: { text: string }): PropertiesDeps {
+      let tmp = '';
+      return {
+        readText: async () => disk.text,
+        getProperties: async (_p, names) => Object.fromEntries(names.map((n) => [n, decode(new RegExp(`<${n}>([^<]*)<`).exec(tmp || disk.text)?.[1] ?? '')])),
+        writer: {
+          readFile: async () => disk.text,
+          writeFile: async (p, s) => { if (p.endsWith('.cw-tmp')) tmp = s; },
+          rename: async () => { disk.text = tmp; tmp = ''; },
+          unlink: async () => {}, realpath: async (p) => p, mode: async () => 0o644, chmod: async () => {}, canWrite: async () => true,
+        },
+      };
+    }
+    it('keeps A &amp; B byte-identical when another field changes', async () => {
+      const disk = { text: CS };
+      const d = deps(disk);
+      const m = await loadProperties('/p/a.csproj', d);
+      const { root, api } = setup(m);
+      expect(input(root, 'Company').value).toBe('A & B');
+      const v = input(root, 'Version'); v.value = '1.0.1'; fire(v, 'input');
+      await saveProperties(m, api.collectEdits(), d);
+      expect(disk.text).toBe(CS.replace('1.0.0', '1.0.1'));
+    });
+    it('writing A & B C escapes the ampersand exactly once', async () => {
+      const disk = { text: CS };
+      const d = deps(disk);
+      const m = await loadProperties('/p/a.csproj', d);
+      const { root, api } = setup(m);
+      const c = input(root, 'Company'); c.value += ' C'; fire(c, 'input');
+      expect(api.collectEdits()).toEqual([{ kind: 'set', name: 'Company', value: 'A & B C' }]);
+      await saveProperties(m, api.collectEdits(), d);
+      expect(disk.text).toContain('<Company>A &amp; B C</Company>');
+    });
   });
 
   it('secrets section sends manageSecrets', () => {

@@ -21,6 +21,11 @@ describe('DotnetCli.getProperties', () => {
     const { cli } = mk('{"Properties":{"A":"x"}}');
     expect(await cli.getProperties('/p/A.csproj', ['A', 'B'])).toEqual({ A: 'x', B: '' });
   });
+  it('returns {} for no names without running a process', async () => {
+    const { cli, exec } = mk('');
+    expect(await cli.getProperties('/p/A.csproj', [])).toEqual({});
+    expect(exec).not.toHaveBeenCalled();
+  });
   it('passes the timeout', async () => {
     const { cli, exec } = mk('{"Properties":{}}');
     await cli.getProperties('/p/A.csproj', ['A', 'B']);

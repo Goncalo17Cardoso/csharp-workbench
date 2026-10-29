@@ -5,11 +5,10 @@ import { nodeTextFs } from '../core/atomicWrite';
 import type { DotnetCli } from '../dotnet/cli';
 import type { Output } from '../output';
 import type { TreeNode } from '../solution/model';
-import { readProjectInfo } from '../solution/projectInfo';
 import { loadProjectItems } from '../solution/projectItems';
 import { loadSolution } from '../solution/slnParse';
 import type { SolutionTreeProvider } from '../solution/SolutionTreeProvider';
-import { chooseText, hasGeneratedHeader, isSyncCandidate } from './candidates';
+import { chooseText, resolveRootNamespace, syncFileInput, syncItemRole } from './candidates';
 import { toWorkspaceEditSpec } from './editSpec';
 import { planSync, type SyncInputFile, type SyncPlan } from './plan';
 
@@ -35,7 +34,7 @@ const labelText = (kind: 'declaration' | 'using' | 'qualified') =>
 export function registerSyncCommands(deps: Deps): vscode.Disposable[] {
   const core = deps.provider.treeCore;
 
-  async function collect(scopeProject: string | undefined, solution: string | undefined, cli: DotnetCli, token: vscode.CancellationToken): Promise<{ files: SyncInputFile[]; dirtyTexts: Set<string> } | undefined> {
+  async function collect(scopeProject: string | undefined, solution: string | undefined, cli: DotnetCli, token: vscode.CancellationToken): Promise<{ files: SyncInputFile[]; generated: string[]; dirtyTexts: Set<string> } | undefined> {
     let projects: string[] = [];
     if (solution) {
       try { projects = (await loadSolution(solution, readText)).projects.map((p) => p.path); } catch (e) {
@@ -47,29 +46,34 @@ export function registerSyncCommands(deps: Deps): vscode.Disposable[] {
     if (scopeProject && !projects.some((p) => path.resolve(p) === path.resolve(scopeProject))) projects.push(scopeProject);
     const open = new Map(vscode.workspace.textDocuments.filter((d) => d.isDirty && d.uri.scheme === 'file').map((d) => [path.resolve(d.uri.fsPath), d]));
     const files: SyncInputFile[] = [];
+    const generated: string[] = [];
     const seen = new Set<string>();
     for (const project of projects) {
       if (token.isCancellationRequested) return undefined;
       const projectDir = path.dirname(project);
-      let rootNamespace: string;
-      try { rootNamespace = readProjectInfo(project, await readText(project)).rootNamespace; } catch (e) {
+      // The evaluated RootNamespace (Directory.Build.props, $(...)); the file name when it cannot be evaluated.
+      let evaluated: string | undefined;
+      try { evaluated = (await cli.getProperties(project, ['RootNamespace'])).RootNamespace; } catch (e) {
         deps.output.info(`${project}: ${errText(e)}`);
-        continue;
       }
+      const rootNamespace = resolveRootNamespace(project, evaluated);
       const items = await loadProjectItems(project, cli, { readdir: (d) => fsp.readdir(d, { withFileTypes: true }) });
       const inScope = !scopeProject || path.resolve(project) === path.resolve(scopeProject);
-      for (const item of items.items.filter((i) => isSyncCandidate(projectDir, i))) {
+      for (const item of items.items) {
+        const role = syncItemRole(projectDir, item);
+        if (role === 'excluded') continue;
         if (token.isCancellationRequested) return undefined;
         if (seen.has(item.fullPath)) continue;
         seen.add(item.fullPath);
         try {
           const text = await chooseText(open.get(path.resolve(item.fullPath))?.getText(), () => nodeTextFs.readFile(item.fullPath));
-          if (hasGeneratedHeader(text)) continue;
-          files.push({ path: item.fullPath, text, projectDir, rootNamespace, inScope });
+          const input = syncFileInput(role, { path: item.fullPath, text, projectDir, rootNamespace, inScope });
+          files.push(input.file);
+          if (input.generated) generated.push(item.fullPath);
         } catch (e) { deps.output.info(`${item.fullPath}: ${errText(e)}`); }
       }
     }
-    return { files, dirtyTexts: new Set(open.keys()) };
+    return { files, generated, dirtyTexts: new Set(open.keys()) };
   }
 
   deps.expose?.(async (nodeOrPath) => {
@@ -92,11 +96,12 @@ export function registerSyncCommands(deps: Deps): vscode.Disposable[] {
         async (_p, token) => {
           const input = await collect(scopeProject, solution, cli, token);
           if (!input || token.isCancellationRequested) return undefined;
-          return { plan: planSync(input.files), texts: new Map(input.files.map((f) => [f.path, f.text])) };
+          return { plan: planSync(input.files), generated: input.generated, texts: new Map(input.files.map((f) => [f.path, f.text])) };
         },
       );
       if (!planned) return;
-      const { plan, texts } = planned;
+      const { plan, texts, generated } = planned;
+      for (const g of generated) deps.output.info(`Sync Namespaces: skipped ${g} (generated)`);
       for (const s of plan.skipped) deps.output.info(`Sync Namespaces: skipped ${s.path} (${s.reason})`);
       for (const a of plan.ambiguous) deps.output.info(`Sync Namespaces: ambiguous ${a.from}.${a.type} -> ${a.targets.join(', ')}`);
       const specs = toWorkspaceEditSpec(plan, texts);

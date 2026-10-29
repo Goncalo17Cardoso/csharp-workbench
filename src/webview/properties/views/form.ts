@@ -19,6 +19,8 @@ interface Entry {
   state: FieldState;
   initial: string | boolean | string[];
   reset: boolean;
+  /** Set once the user changes the control; an untouched field never emits an edit. */
+  touched: boolean;
   current(): string | boolean | string[];
   message(): string | undefined;
   update(): void; // re-renders message and badges
@@ -50,7 +52,7 @@ export function renderProperties(
     const edits: PropertyEdit[] = [];
     for (const en of entries) {
       const { def, state } = en;
-      if (state.origin === 'conditional') continue;
+      if (state.origin === 'conditional' || (!en.touched && !en.reset)) continue;
       const cur = en.current();
       if (def.kind === 'tfms') {
         const tfms = cur as string[];
@@ -117,8 +119,11 @@ export function renderProperties(
     const controlWrap = el('div', 'props-control');
     row.append(label, controlWrap, badges, msg);
     sections.get(def.section)!.append(row);
-    const locked = ro || state.origin === 'conditional';
+    // A text input cannot hold CR/LF, so a multi-line value in the .csproj is read-only here.
+    const multiline = state.origin === 'project' && /[\r\n]/.test(state.raw ?? '');
+    const locked = ro || state.origin === 'conditional' || multiline;
     const base = state.origin === 'project' ? (state.raw ?? state.evaluated) : state.evaluated;
+    const edited = (): void => { entry.reset = false; entry.touched = true; sync(); };
 
     let currentFn: () => string | boolean | string[];
     let initial: string | boolean | string[];
@@ -130,7 +135,7 @@ export function renderProperties(
       input.type = 'checkbox';
       input.checked = base.trim().toLowerCase() === 'true';
       input.disabled = locked;
-      input.addEventListener('change', () => { entry.reset = false; sync(); });
+      input.addEventListener('change', edited);
       controlWrap.append(input);
       label.htmlFor = (input.id = `f-${def.property}`);
       initial = input.checked;
@@ -143,7 +148,7 @@ export function renderProperties(
       for (const o of opts) { const op = el('option', undefined, o); op.value = o; sel.append(op); }
       sel.value = base;
       sel.disabled = locked;
-      sel.addEventListener('change', () => { entry.reset = false; sync(); });
+      sel.addEventListener('change', edited);
       controlWrap.append(sel);
       label.htmlFor = (sel.id = `f-${def.property}`);
       initial = base;
@@ -165,7 +170,7 @@ export function renderProperties(
           const chip = el('span', 'props-chip', t);
           const x = el('button', 'props-chip-x', '×');
           x.disabled = locked;
-          x.addEventListener('click', () => { tfms = tfms.filter((y) => y !== t); entry.reset = false; drawChips(); sync(); });
+          x.addEventListener('click', () => { tfms = tfms.filter((y) => y !== t); drawChips(); edited(); });
           chip.append(x);
           chips.append(chip);
         }
@@ -175,9 +180,8 @@ export function renderProperties(
         if (v === '' || validateTfm(v) !== undefined) return;
         if (!tfms.includes(v)) tfms = [...tfms, v];
         input.value = '';
-        entry.reset = false;
         drawChips();
-        sync();
+        edited();
       };
       input.addEventListener('input', sync);
       input.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); commit(); } });
@@ -192,7 +196,7 @@ export function renderProperties(
       input.type = 'text';
       input.value = base;
       input.disabled = locked;
-      input.addEventListener('input', () => { entry.reset = false; sync(); });
+      input.addEventListener('input', edited);
       controlWrap.append(input);
       label.htmlFor = (input.id = `f-${def.property}`);
       initial = base;
@@ -201,7 +205,7 @@ export function renderProperties(
     }
 
     const entry: Entry = {
-      def, state, initial, reset: false,
+      def, state, initial, reset: false, touched: false,
       current: currentFn,
       message: () => {
         if (state.origin === 'conditional') return undefined;
@@ -222,14 +226,19 @@ export function renderProperties(
     // Badges
     if (state.origin === 'inherited') badges.append(el('span', 'badge', L('inherited')));
     if (state.duplicates) badges.append(el('span', 'badge badge-warn', L('duplicate')));
-    if (state.origin === 'conditional') {
-      badges.append(el('span', 'badge', L('set per configuration')));
+    if (state.origin === 'project' && ro) badges.append(el('span', 'badge badge-warn', L('from .csproj, not evaluated')));
+    if (multiline) badges.append(el('span', 'badge', L('multi-line')));
+    if (state.origin === 'conditional' || multiline) {
+      if (state.origin === 'conditional') badges.append(el('span', 'badge', L('set per configuration')));
       const link = el('a', 'props-link', L('Open in .csproj'));
       link.href = '#';
       link.addEventListener('click', (e) => { e.preventDefault(); send({ type: 'openCsproj', property: def.property }); });
       badges.append(link);
     }
-    if (state.origin === 'project' && !ro) {
+    if (state.origin === 'project' && !ro && state.raw !== undefined && state.raw !== state.evaluated) {
+      row.append(el('div', 'props-evaluated', L('Evaluated: {0}').replace('{0}', () => state.evaluated)));
+    }
+    if (state.origin === 'project' && !ro && !multiline) {
       const btn = el('button', 'props-reset', L('Reset'));
       btn.addEventListener('click', () => {
         entry.reset = true;

@@ -7,6 +7,7 @@ import { ALL_PROPERTIES, FIELDS } from './schema';
 export interface FieldState {
   property: string;
   evaluated: string;
+  /** The decoded text of the last unconditional element in the .csproj (`$(Foo)` stays literal). */
   raw?: string;
   origin: PropertyOrigin;
   duplicates: boolean;
@@ -45,7 +46,7 @@ export async function loadProperties(projectPath: string, deps: PropertiesDeps):
     return {
       property: f.property,
       evaluated: values[source] ?? '',
-      raw: o.origin === 'project' ? o.last?.rawValue : undefined,
+      raw: o.origin === 'project' ? o.last?.value : undefined,
       origin: o.origin,
       duplicates: o.duplicates,
     };
@@ -58,7 +59,9 @@ export async function saveProperties(
   edits: PropertyEdit[],
   deps: PropertiesDeps,
 ): Promise<PropertiesModel> {
+  if (edits.length === 0) return model; // nothing to save: no write, no evaluation
   const newText = applyPropertyEdits(model.text, edits);
+  if (newText === model.text) return model;
   const names = [...new Set(edits.flatMap((e) => (e.kind === 'targetFrameworks' ? ['TargetFramework', 'TargetFrameworks'] : [e.name])))];
   const validate = async (): Promise<void> => {
     const got = await deps.getProperties(model.projectPath, names);

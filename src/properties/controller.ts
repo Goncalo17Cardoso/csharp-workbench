@@ -30,6 +30,7 @@ export interface ControllerDeps extends PropertiesDeps {
 const SECTIONS = ['Application', 'Build', 'Package', 'Assembly', 'Debug', 'Secrets'];
 const UI = [
   'Save', 'Add', 'Reload', 'Reset', 'inherited', 'duplicate', 'set per configuration', 'Open in .csproj',
+  'multi-line', 'Evaluated: {0}', 'from .csproj, not evaluated',
   'The project could not be evaluated, so it is read-only.', 'The project changed on disk.',
   'Manage user secrets',
   'Launch profiles', 'New profile', 'Duplicate', 'Rename', 'Delete', 'Project', 'Executable', 'Name', 'Value',
@@ -45,6 +46,23 @@ export function labelKeys(): string[] {
 }
 
 const msg = (e: unknown): string => (e instanceof Error ? e.message : String(e));
+
+/** The first edit the schema validators reject, as [field label, message] l10n keys; undefined when all pass. */
+export function invalidEdit(edits: PropertyEdit[]): [label: string, message: string] | undefined {
+  for (const e of edits) {
+    if (e.kind === 'remove') continue;
+    if (e.kind === 'targetFrameworks') {
+      const label = FIELDS.find((f) => f.kind === 'tfms')!.label;
+      const bad = e.tfms.length === 0 ? validateTfm('') : e.tfms.map(validateTfm).find((m) => m !== undefined);
+      if (bad) return [label, bad];
+      continue;
+    }
+    const def = FIELDS.find((f) => f.property === e.name);
+    const bad = def?.validate?.(e.value);
+    if (def && bad) return [def.label, bad];
+  }
+  return undefined;
+}
 
 export class PropertiesController {
   private model: PropertiesModel | undefined;
@@ -188,9 +206,16 @@ export class PropertiesController {
   }
 
   private async save(edits: PropertyEdit[]): Promise<boolean> {
+    if (edits.length === 0) return false; // nothing to save: no write, no evaluation
     if (!this.model) { this.deps.post({ type: 'error', message: this.deps.t('Project not loaded') }); return false; }
     if (this.model.readOnly) {
       this.deps.post({ type: 'error', message: this.deps.t('The project could not be evaluated, so it is read-only.') });
+      return false;
+    }
+    const invalid = invalidEdit(edits);
+    if (invalid) {
+      const { t } = this.deps;
+      this.deps.post({ type: 'error', message: t('{0}: {1}', t(invalid[0]), t(invalid[1])) });
       return false;
     }
     this.saving = true;

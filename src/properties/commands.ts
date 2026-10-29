@@ -55,6 +55,15 @@ export function registerPropertiesCommands(deps: Deps): vscode.Disposable[] {
     if (!project) return;
     if (open.has(project)) { open.get(project)!.panel?.reveal(); return; }
     open.set(project, {}); // placeholder before the first await: a second invocation must not open another panel
+    try {
+      await createPanel(project);
+    } catch (e) {
+      open.delete(project); // so the project can be opened again
+      throw e;
+    }
+  }
+
+  async function createPanel(project: string): Promise<void> {
     const cli = await deps.getCli();
     if (!cli) {
       open.delete(project);

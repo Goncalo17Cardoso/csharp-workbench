@@ -40,6 +40,21 @@ describe('model', () => {
     expect(m.error).toBe('boom');
     expect(m.fields.every((f) => f.evaluated === '')).toBe(true);
   });
+  it('loadProperties gives the decoded text of a project value', async () => {
+    const { deps } = mk(CSPROJ.replace('</PropertyGroup>', '  <Company>Tom &amp; Jerry</Company>\n  </PropertyGroup>'), () => ({}));
+    const m = await loadProperties(P, deps);
+    expect(m.fields.find((f) => f.property === 'Company')).toMatchObject({ origin: 'project', raw: 'Tom & Jerry' });
+  });
+  it('saveProperties with no edits writes nothing and runs no evaluation', async () => {
+    let calls = 0;
+    const { deps, disk } = mk(CSPROJ, () => { calls++; return {}; });
+    const m = await loadProperties(P, deps);
+    calls = 0;
+    const out = await saveProperties(m, [], deps);
+    expect(out).toBe(m);
+    expect(disk.writes).toEqual([]);
+    expect(calls).toBe(0);
+  });
   it('saveProperties refuses when file changed on disk', async () => {
     const { deps, disk } = mk(CSPROJ, () => ({}));
     const m = await loadProperties(P, deps);

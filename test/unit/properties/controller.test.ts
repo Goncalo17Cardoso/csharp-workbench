@@ -6,10 +6,11 @@ const P = '/p/a.csproj';
 const CSPROJ = '<Project Sdk="Microsoft.NET.Sdk">\n  <PropertyGroup>\n    <TargetFramework>net8.0</TargetFramework>\n  </PropertyGroup>\n</Project>\n';
 
 function mk(opts: { evalFails?: boolean; diskChangesBeforeWrite?: boolean; launch?: string; confirm?: boolean; viaWriter?: boolean } = {}) {
-  const s = { launch: opts.launch as string | undefined, created: [] as string[], confirms: [] as string[], active: undefined as string | undefined, text: CSPROJ, tmp: '', writes: 0, posts: [] as PropsToWebview[], secrets: 0, opened: [] as string[] };
+  const s = { launch: opts.launch as string | undefined, created: [] as string[], confirms: [] as string[], active: undefined as string | undefined, text: CSPROJ, tmp: '', writes: 0, evals: 0, posts: [] as PropsToWebview[], secrets: 0, opened: [] as string[] };
   const c = new PropertiesController(P, {
     readText: async () => s.text,
     getProperties: async (_p, names) => {
+      s.evals++;
       if (opts.evalFails) throw new Error('boom');
       const m = /<(Version)>([^<]*)</.exec(s.tmp || s.text);
       return Object.fromEntries(names.map((n) => [n, n === 'Version' && m ? m[2] : n === 'TargetFramework' ? 'net8.0' : '']));
@@ -34,7 +35,7 @@ function mk(opts: { evalFails?: boolean; diskChangesBeforeWrite?: boolean; launc
     post: (m) => s.posts.push(m),
     onSecrets: () => { s.secrets++; },
     openAt: (p) => s.opened.push(p),
-    t: (k) => `T:${k}`,
+    t: (k, ...a) => [`T:${k}`, ...a].join('|'),
   });
   return { s, c };
 }
@@ -50,6 +51,43 @@ describe('PropertiesController', () => {
     const m = s.posts[1] as Extract<PropsToWebview, { type: 'model' }>;
     for (const k of labelKeys()) expect(m.labels[k]).toBe(`T:${k}`);
     expect(m.labels['Output type']).toBe('T:Output type');
+  });
+
+  it('saveCurrent with nothing to save writes nothing and runs no evaluation', async () => {
+    const { s, c } = mk();
+    await c.handle({ type: 'ready' });
+    s.posts.length = 0;
+    s.evals = 0;
+    expect(await c.saveCurrent()).toBe(false);
+    await c.handle({ type: 'save', edits: [] });
+    expect(s.writes).toBe(0);
+    expect(s.evals).toBe(0);
+    expect(types(s)).toEqual([]);
+  });
+
+  it('saveCurrent with an invalid Version posts an error naming the field and writes nothing', async () => {
+    const { s, c } = mk();
+    await c.handle({ type: 'ready' });
+    s.posts.length = 0;
+    s.evals = 0;
+    await c.handle({ type: 'dirty', dirty: true, edits: [{ kind: 'set', name: 'Version', value: 'abc' }] });
+    expect(await c.saveCurrent()).toBe(false);
+    expect(s.writes).toBe(0);
+    expect(s.evals).toBe(0);
+    expect(s.posts).toEqual([{ type: 'error', message: 'T:{0}: {1}|T:Version|T:Use a version like 1.2.3, 1.2.3-beta.1 or 1.2.3.4.' }]);
+    expect(s.text).toBe(CSPROJ);
+  });
+
+  it('save rejects an invalid identifier and an invalid target framework', async () => {
+    const { s, c } = mk();
+    await c.handle({ type: 'ready' });
+    s.posts.length = 0;
+    await c.handle({ type: 'save', edits: [{ kind: 'set', name: 'Version', value: '1.0.0' }, { kind: 'set', name: 'RootNamespace', value: '1abc' }] });
+    await c.handle({ type: 'save', edits: [{ kind: 'targetFrameworks', tfms: ['net8.0', 'bogus'] }] });
+    expect(s.writes).toBe(0);
+    const errs = s.posts.map((p) => (p.type === 'error' ? p.message : p.type));
+    expect(errs[0]).toContain('T:Default namespace');
+    expect(errs[1]).toContain('T:Target framework(s)');
   });
 
   it('save posts saved and a reloaded model', async () => {

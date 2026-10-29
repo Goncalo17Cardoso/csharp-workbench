@@ -16,7 +16,8 @@
     "test:cli": "node scripts/vitest-safe.mjs run test/integration/cli-cpm.int.test.ts test/integration/slnFolders.int.test.ts test/integration/properties.int.test.ts",
     "test:int": "node scripts/vscode-test-safe.mjs",
     "build:test": "node esbuild.mjs --tests",
-    "package": "vsce package --allow-missing-repository"
+    "vscode:prepublish": "npm run build",
+    "package": "npm run build && vsce package --allow-missing-repository"
   },
   "dependencies": {
     "dompurify": "^3.4.17",
