@@ -22,7 +22,7 @@ describe('analyzeCs', () => {
   });
 
   it('offsets index the JS string including a leading BOM', () => {
-    const text = '﻿namespace A.B;\nclass C {}';
+    const text = '\uFEFFnamespace A.B;\nclass C {}';
     const ns = analyzeCs(text).namespaces[0];
     expect(ns.nameStart).toBe(11);
     expect(text.slice(ns.nameStart, ns.nameEnd)).toBe('A.B');
@@ -187,6 +187,42 @@ describe('analyzeCs', () => {
     expect(text.slice(g.start - 8, g.start)).toBe('global::');
     const t = r.qualified[5];
     expect(text.slice(t.start, t.end)).toBe('Acme /* c */ . Models\n.Thing');
+  });
+
+  it('namespace after an assembly attribute is reported (block and file-scoped)', () => {
+    const block = analyzeCs('using System;\n[assembly: InternalsVisibleTo("T")]\nnamespace N\n{\n  [Serializable] public class A {}\n}');
+    expect(block.namespaces.map((n) => [n.name, n.fileScoped])).toEqual([['N', false]]);
+    expect(block.typeNames).toEqual(['A']);
+    const file = analyzeCs('[module: Foo]\nnamespace M.X;\n[Serializable]\npublic class B {}');
+    expect(file.namespaces.map((n) => [n.name, n.fileScoped])).toEqual([['M.X', true]]);
+    expect(file.typeNames).toEqual(['B']);
+  });
+
+  it('chains after a range or spread operator are reported', () => {
+    const text = 'class C { int[] a = [.. Acme.Models.Defaults]; object b = x[1..Acme.Max]; object c = y.Not.Me; }';
+    const { q, qSlices } = spans(text);
+    expect(q).toEqual(['Acme.Models.Defaults', 'Acme.Max', 'y.Not.Me']);
+    expect(qSlices).toEqual(q);
+  });
+
+  it('CRLF offsets', () => {
+    const text = '﻿using A.B;\r\nnamespace Foo.Bar;\r\nclass C { object o = X.Y; }\r\n';
+    const { r, ns, usings, qSlices } = spans(text);
+    expect(r.namespaces[0].nameStart).toBe(23);
+    expect(ns).toEqual(['Foo.Bar']);
+    expect(usings).toEqual(['A.B']);
+    expect(qSlices).toEqual(['X.Y']);
+  });
+
+  it('unterminated strings, comments and holes finish without throwing', () => {
+    const inputs = ['class C { string s = "abc', 'x = @"abc', 'x = """abc', '/* never closed', 'x = $"{a', 'x = $$"""{{a', "x = '", 'x = $', 'x = @', '#', 'x = $"{A.B'];
+    for (const src of inputs) expect(() => analyzeCs(src)).not.toThrow();
+    expect(analyzeCs('"oops\nnamespace After;').namespaces.map((n) => n.name)).toEqual(['After']);
+  });
+
+  it('hasConditional is set by any #if outside comments and strings', () => {
+    expect(analyzeCs('namespace A;\nclass C {\n#if DEBUG\n  int x;\n#endif\n}').hasConditional).toBe(true);
+    expect(analyzeCs('namespace A;\n// #if DEBUG\nclass C { string s = @"\n#if X\n"; }\n#region R\n#endregion').hasConditional).toBe(false);
   });
 
   it('numbers and range operators do not form chains', () => {

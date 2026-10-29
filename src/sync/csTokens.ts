@@ -8,7 +8,9 @@
 //
 // Known limits (text-level, not Roslyn):
 // - Both branches of `#if/#else` are tokenized; braces split across branches confuse nesting.
-// - Unicode escapes in identifiers (`A`) are not decoded.
+// - Unicode escapes in identifiers (`\u0041`) are not decoded.
+// - Verbatim identifiers keep their `@` in every reported name (`@class`), matching what
+//   `namespaceFor` produces, so names compare directly with expected namespaces.
 // - Names that span trivia (`A /* c */ . B`) report `text` without trivia; the span covers it.
 
 export interface NsDecl { name: string; nameStart: number; nameEnd: number; fileScoped: boolean; depth: number } // depth 0 = top level
@@ -22,7 +24,11 @@ export interface QualifiedName {
   /** Chain was written as `global::A.B`; the prefix is outside text/start..end. */
   global: boolean;
 }
-export interface CsFileInfo { namespaces: NsDecl[]; usings: UsingDirective[]; typeNames: string[] /* top-level types per namespace */; qualified: QualifiedName[]; hasPreprocessorAroundNamespace: boolean }
+export interface CsFileInfo {
+  namespaces: NsDecl[]; usings: UsingDirective[]; typeNames: string[] /* top-level types per namespace */; qualified: QualifiedName[]; hasPreprocessorAroundNamespace: boolean;
+  /** Any `#if` directive outside comments and strings. */
+  hasConditional: boolean;
+}
 
 interface Tok { k: 'id' | 'p' | 'lit'; text: string; start: number; end: number; pp: number }
 
@@ -33,7 +39,7 @@ type Frame = StrFrame | HoleFrame | FmtFrame;
 
 const ID_START = /[\p{L}\p{Nl}_]/u;
 const ID_PART = /[\p{L}\p{Nl}\p{Mn}\p{Mc}\p{Nd}\p{Pc}\p{Cf}]/u;
-const isNewline = (c: string) => c === '\n' || c === '\r' || c === '\u0085' || c === ' ' || c === ' ';
+const isNewline = (c: string) => c === '\n' || c === '\r' || c === '\u0085' || c === '\u2028' || c === '\u2029';
 const isDigit = (c: string | undefined) => c !== undefined && c >= '0' && c <= '9';
 
 function charAt(text: string, i: number): string {
@@ -47,11 +53,12 @@ function run(text: string, i: number, ch: string): number {
   return j - i;
 }
 
-function lex(text: string): Tok[] {
+function lex(text: string): { toks: Tok[]; hasConditional: boolean } {
   const toks: Tok[] = [];
   const stack: Frame[] = [];
   const n = text.length;
   let pp = 0;
+  let hasConditional = false;
   let lineStart = true;
   let i = 0;
 
@@ -80,7 +87,7 @@ function lex(text: string): Tok[] {
       let j = i + 1;
       while (j < n && !isNewline(text[j])) j++;
       const kw = /^\s*(\w+)/.exec(text.slice(i + 1, j))?.[1];
-      if (kw === 'if') pp++;
+      if (kw === 'if') { pp++; hasConditional = true; }
       else if (kw === 'endif') pp = Math.max(0, pp - 1);
       i = j;
       return;
@@ -215,7 +222,7 @@ function lex(text: string): Tok[] {
     if (!s.verbatim && isNewline(c)) { stack.pop(); popString(); continue; }
     i++;
   }
-  return toks;
+  return { toks, hasConditional };
 }
 
 const KEYWORDS = new Set(('abstract as base bool break byte case catch char checked class const continue decimal default delegate do double else enum event '
@@ -229,8 +236,8 @@ const isId = (t: Tok | undefined, s?: string) => t !== undefined && t.k === 'id'
 const isName = (t: Tok | undefined) => isId(t) && !KEYWORDS.has(t!.text);
 
 export function analyzeCs(text: string): CsFileInfo {
-  const toks = lex(text);
-  const info: CsFileInfo = { namespaces: [], usings: [], typeNames: [], qualified: [], hasPreprocessorAroundNamespace: false };
+  const { toks, hasConditional } = lex(text);
+  const info: CsFileInfo = { namespaces: [], usings: [], typeNames: [], qualified: [], hasPreprocessorAroundNamespace: false, hasConditional };
   const stack: ('ns' | 'type' | 'other')[] = [];
   let fileScoped = false;
   let pending: 'type' | null = null;
@@ -345,7 +352,8 @@ export function analyzeCs(text: string): CsFileInfo {
       if (isP(t, '}')) { stack.pop(); i++; continue; }
       if (nsCtx() && t.k === 'id') {
         let next = -1;
-        if (t.text === 'namespace' && atBoundary(i)) next = parseNamespace(i);
+        // `namespace` is reserved, so in namespace context it always starts a declaration (even after `[assembly: X]`).
+        if (t.text === 'namespace') next = parseNamespace(i);
         else if ((t.text === 'using' || (t.text === 'global' && isId(toks[i + 1], 'using'))) && atBoundary(i)) next = parseUsing(i);
         if (next >= 0) { i = next; continue; }
         if (TYPE_KW.has(t.text) || t.text === 'record' || t.text === 'delegate') {
@@ -362,7 +370,8 @@ export function analyzeCs(text: string): CsFileInfo {
     }
 
     // Dotted chains: A.B(.C)* or global::A.B, not continuing a member access.
-    if (isName(t) && isP(toks[i + 1], '.') && !isP(toks[i - 1], '.')) {
+    const afterRange = isP(toks[i - 1], '.') && isP(toks[i - 2], '.') && toks[i - 2].end === toks[i - 1].start;
+    if (isName(t) && isP(toks[i + 1], '.') && (!isP(toks[i - 1], '.') || afterRange)) {
       let global = false;
       let ok = true;
       if (isP(toks[i - 1], '::')) {
