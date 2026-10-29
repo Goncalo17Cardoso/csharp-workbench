@@ -71,4 +71,39 @@ describe('launchSettings', () => {
     expect(t).toContain('\r\n\t\t"N"');
     expect(t.replace(/\r\n/g, '')).not.toContain('\n');
   });
+  const code = (fn: () => unknown) => { try { fn(); } catch (e) { return (e as ProfileError).code; } return 'none'; };
+  const N = { kind: 'new', name: 'N', commandName: 'Project' } as const;
+  it('error codes', () => {
+    expect(code(() => applyProfileAction(sample, { kind: 'new', name: 'A', commandName: 'Project' }))).toBe('exists');
+    expect(code(() => applyProfileAction(sample, { kind: 'delete', name: 'Q' }))).toBe('missing');
+    expect(code(() => applyProfileAction(sample, { kind: 'new', name: '  ', commandName: 'Project' }))).toBe('emptyName');
+  });
+  it('rejects malformed, comment-only, null and array roots with invalid', () => {
+    for (const t of ['garbage{', '// only comment', 'null', '[1]', '{"profiles":{"a":1}', '5']) expect(code(() => applyProfileAction(t, N)), t).toBe('invalid');
+    expect(parseProfiles('[1]')).toEqual([]);
+    expect(parseProfiles('null')).toEqual([]);
+  });
+  it('whitespace-only text is treated as empty', () => expect(parseProfiles(applyProfileAction('  \n', N))).toHaveLength(1));
+  it('non-object profile entries still count as existing keys', () => {
+    const t = '{"profiles":{"X":5,"Y":{"commandName":"Project"}}}';
+    expect(code(() => applyProfileAction(t, { kind: 'new', name: 'X', commandName: 'Project' }))).toBe('exists');
+    expect(code(() => applyProfileAction(t, { kind: 'rename', from: 'Y', name: 'X' }))).toBe('exists');
+    expect(code(() => applyProfileAction(t, { kind: 'duplicate', from: 'Y', name: 'X' }))).toBe('exists');
+  });
+  it('action on text with no profiles key', () => {
+    expect(parseProfiles(applyProfileAction('{"a":1}', N))).toMatchObject([{ name: 'N' }]);
+  });
+  it('rename escapes quotes, backslash and accents', () => {
+    const t = applyProfileAction(sample, { kind: 'rename', from: 'A', name: 'q"\\é' });
+    expect(parseProfiles(t)[0].name).toBe('q"\\é');
+  });
+  it('rename ignores same text in values and comments', () => {
+    const t = '{ // "A" here\n"profiles":{"B":{"commandName":"Project","launchUrl":"A"},"A":{"commandName":"Project"}}}';
+    const r = applyProfileAction(t, { kind: 'rename', from: 'A', name: 'Z' });
+    expect(r).toBe(t.replace('"A":{', '"Z":{'));
+  });
+  it('environmentVariables stringifies numbers/booleans and skips others', () => {
+    const p = parseProfiles('{"profiles":{"A":{"commandName":"Project","environmentVariables":{"a":1,"b":true,"c":null,"d":{},"e":"s"}}}}');
+    expect(p[0].environmentVariables).toEqual({ a: '1', b: 'true', e: 's' });
+  });
 });

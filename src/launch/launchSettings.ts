@@ -1,5 +1,5 @@
 // Pure module: no vscode, fs or node imports (webview-safe).
-import { applyEdits, findNodeAtLocation, getNodeValue, modify, parse, parseTree, type FormattingOptions } from 'jsonc-parser';
+import { applyEdits, type ParseError, findNodeAtLocation, getNodeValue, modify, parse, parseTree, type FormattingOptions } from 'jsonc-parser';
 
 export interface LaunchProfile {
   name: string;
@@ -23,7 +23,7 @@ export type ProfileAction =
   | { kind: 'env'; name: string; env: Record<string, string> };
 
 export class ProfileError extends Error {
-  constructor(public code: 'exists' | 'missing' | 'emptyName', message: string) {
+  constructor(public code: 'exists' | 'missing' | 'emptyName' | 'invalid', message: string) {
     super(message);
     this.name = 'ProfileError';
   }
@@ -49,7 +49,7 @@ export function parseProfiles(text: string | undefined): LaunchProfile[] {
     if (!isObj(v)) continue;
     const commandName = str(v.commandName) ?? '';
     const env: Record<string, string> = {};
-    if (isObj(v.environmentVariables)) for (const [k, e] of Object.entries(v.environmentVariables)) env[k] = String(e);
+    if (isObj(v.environmentVariables)) for (const [k, e] of Object.entries(v.environmentVariables)) if (typeof e === 'string' || typeof e === 'number' || typeof e === 'boolean') env[k] = String(e);
     const p: LaunchProfile = { name, commandName, supported: commandName === 'Project' || commandName === 'Executable', environmentVariables: env };
     for (const f of ['commandLineArgs', 'workingDirectory', 'applicationUrl', 'launchUrl', 'executablePath'] as const) {
       const s = str(v[f]);
@@ -70,16 +70,18 @@ function detectFormat(text: string): FormattingOptions {
 
 export function applyProfileAction(text: string | undefined, action: ProfileAction): string {
   let src = text && text.trim() ? text : '{"profiles":{}}';
+  const errors: ParseError[] = [];
+  const parsed = parse(src, errors, { allowTrailingComma: true });
+  if (errors.length || !isObj(parsed)) throw new ProfileError('invalid', 'launchSettings.json is not a valid JSON object');
   const fmt = detectFormat(text ?? '');
   const opts = { formattingOptions: fmt };
   const edit = (path: (string | number)[], value: unknown) => { src = applyEdits(src, modify(src, path, value, opts)); };
 
-  let existing = parseProfiles(src);
   // Ensure a profiles object exists (e.g. "{}" or non-object profiles).
   const root = parse(src, [], { allowTrailingComma: true });
   if (!isObj(root) || !isObj(root.profiles)) edit(['profiles'], {});
-  existing = parseProfiles(src);
-  const has = (n: string) => existing.some((p) => p.name === n);
+  const has = (n: string) =>
+    !!findNodeAtLocation(parseTree(src, [], { allowTrailingComma: true })!, ['profiles'])?.children?.some((c) => c.children?.[0]?.value === n);
   const need = (n: string) => { if (!has(n)) throw new ProfileError('missing', `Profile not found: ${n}`); };
   const fresh = (n: string) => {
     if (!n.trim()) throw new ProfileError('emptyName', 'Profile name is empty');
