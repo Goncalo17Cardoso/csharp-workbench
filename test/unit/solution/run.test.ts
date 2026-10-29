@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { DotnetCli } from '../../../src/dotnet/cli';
 import type { Exec } from '../../../src/dotnet/exec';
-import { createEndWaiter, debugConfigFor, expandEnv, dotnetTask, runTfm, targetPathStep } from '../../../src/solution/runCore';
+import { createEndWaiter, debugConfigFor, expandEnv, executableRun, profileDebugConfigs, dotnetTask, runTfm, targetPathStep } from '../../../src/solution/runCore';
 
 describe('dotnetTask', () => {
   it('build', () => expect(dotnetTask('build', '/s/Api/MyApp.Api.csproj', 'dotnet'))
@@ -121,5 +121,22 @@ describe('launch profiles in run and debug', () => {
     const c = debugConfigFor('/s/A.csproj', '/t.dll', 'A', prof({ commandName: 'Executable', executablePath: '%HOME%/bin/tool', applicationUrl: 'http://x' }), { HOME: '/h' }) as Record<string, unknown>;
     expect(c.program).toBe('/h/bin/tool');
     expect(c.env).toBeUndefined();
+  });
+
+  it('executableRun expands path, args, cwd and env', () => {
+    const r = executableRun(prof({ name: 'tool', commandName: 'Executable', executablePath: '%HOME%/t', commandLineArgs: 'a "b c"', workingDirectory: 'w', environmentVariables: { X: '$HOME' } }), '/s/A', { HOME: '/h' });
+    expect(r).toEqual({ name: 'Run tool', file: '/h/t', args: ['a', 'b c'], cwd: '/s/A/w', env: { X: '/h' } });
+    expect(executableRun(prof({ name: 't', commandName: 'Executable', executablePath: '/x' }), '/s/A').cwd).toBe('/s/A');
+  });
+
+  it('profileDebugConfigs gives one entry per supported profile and keeps Executable program', () => {
+    const list = [prof({ name: 'web' }), prof({ name: 'iis', commandName: 'IISExpress', supported: false }),
+      prof({ name: 'tool', commandName: 'Executable', executablePath: '/bin/t' })];
+    const c = profileDebugConfigs('/s/A/A.csproj', 'A', list, {});
+    expect(c.map((x) => x.name)).toEqual(['C# Workbench: A (web)', 'C# Workbench: A (tool)']);
+    expect(c[0].program).toBe('');
+    expect(c[1].program).toBe('/bin/t');
+    expect(c[1].csharpWorkbenchKeepProgram).toBe(true);
+    expect(profileDebugConfigs('/s/A/A.csproj', 'A', [], {})).toHaveLength(1);
   });
 });

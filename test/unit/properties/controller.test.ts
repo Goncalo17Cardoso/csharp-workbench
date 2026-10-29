@@ -199,5 +199,33 @@ describe('PropertiesController', () => {
       expect(s.active).toBe('b');
       expect(PM(s).model.active).toBe('b');
     });
+
+    it('two profile actions fired without awaiting both end up in the file', async () => {
+      const { s, c } = mk({ viaWriter: true });
+      s.text = '{"profiles":{"web":{"commandName":"Project"}}}';
+      await c.handle({ type: 'ready' });
+      const a = c.handle({ type: 'profiles', action: { kind: 'set', name: 'web', field: 'launchUrl', value: 'u' } });
+      const b = c.handle({ type: 'profiles', action: { kind: 'set', name: 'web', field: 'applicationUrl', value: 'http://x' } });
+      await Promise.all([a, b]);
+      expect(s.text).toContain('"launchUrl": "u"');
+      expect(s.text).toContain('"applicationUrl": "http://x"');
+    });
+
+    it('an external change to launchSettings.json is refused as changed on disk', async () => {
+      const { s, c } = mk({ viaWriter: true, diskChangesBeforeWrite: true });
+      s.text = '{"profiles":{"web":{"commandName":"Project"}}}';
+      await c.handle({ type: 'ready' });
+      s.posts.length = 0;
+      await c.handle({ type: 'profiles', action: { kind: 'set', name: 'web', field: 'launchUrl', value: 'u' } });
+      const err = s.posts.find((p) => p.type === 'error') as Extract<PropsToWebview, { type: 'error' }>;
+      expect(err.message).toContain('changed on disk');
+      expect(s.text).not.toContain('launchUrl');
+    });
+
+    it('a malformed file is flagged invalid in the model', async () => {
+      const { s, c } = mk({ launch: '{ nope' });
+      await c.handle({ type: 'ready' });
+      expect(PM(s).model.invalid).toBeTruthy();
+    });
   });
 });

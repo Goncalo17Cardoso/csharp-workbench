@@ -1,4 +1,5 @@
 // Host-side logic of the Project Properties panel. Pure: no vscode import.
+import { parse, type ParseError } from 'jsonc-parser';
 import { ChangedOnDiskError, writeTextAtomically } from '../core/atomicWrite';
 import { resolveActiveProfile } from '../launch/activeProfile';
 import { applyProfileAction, launchSettingsPath, parseProfiles, ProfileError, type ProfileAction } from '../launch/launchSettings';
@@ -51,6 +52,7 @@ export class PropertiesController {
   private saving = false;
   private edits: PropertyEdit[] = [];
   private launchText: string | undefined;
+  private queue: Promise<unknown> = Promise.resolve();
 
   constructor(private readonly projectPath: string, private readonly deps: ControllerDeps) {}
 
@@ -87,11 +89,10 @@ export class PropertiesController {
         await this.save(m.edits);
         return;
       case 'profiles':
-        await this.profileAction(m.action);
+        await this.enqueue(() => this.profileAction(m.action));
         return;
       case 'setActiveProfile':
-        await this.deps.launch.setActive(m.name);
-        this.postProfiles();
+        await this.enqueue(async () => { await this.deps.launch.setActive(m.name); this.postProfiles(); });
         return;
     }
   }
@@ -117,6 +118,13 @@ export class PropertiesController {
     await this.loadProfiles();
   }
 
+  /** Profile actions run one at a time, so each applies to the text written by the previous one. */
+  private enqueue(fn: () => Promise<void>): Promise<void> {
+    const run = this.queue.then(fn, fn);
+    this.queue = run.catch(() => undefined);
+    return run;
+  }
+
   private get launchPath(): string { return launchSettingsPath(this.projectPath); }
 
   private async loadProfiles(): Promise<void> {
@@ -130,9 +138,14 @@ export class PropertiesController {
 
   private postProfiles(): void {
     const profiles = parseProfiles(this.launchText);
+    const active = resolveActiveProfile(profiles, this.deps.launch.getActive())?.name;
+    const errors: ParseError[] = [];
+    const root: unknown = this.launchText?.trim() ? parse(this.launchText, errors, { allowTrailingComma: true }) : {};
+    const invalid = errors.length > 0 || typeof root !== 'object' || root === null || Array.isArray(root);
     const model: LaunchProfilesView = {
       profiles, path: this.launchPath, exists: this.launchText !== undefined,
-      ...(resolveActiveProfile(profiles, this.deps.launch.getActive()) ? { active: resolveActiveProfile(profiles, this.deps.launch.getActive())!.name } : {}),
+      ...(active ? { active } : {}),
+      ...(invalid ? { invalid: this.deps.t('launchSettings.json is not valid JSON; fix it and reload.') } : {}),
     };
     this.deps.post({ type: 'profilesModel', model });
   }

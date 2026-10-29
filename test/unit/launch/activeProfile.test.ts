@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { getActiveProfileName, resolveActiveProfile, setActiveProfileName } from '../../../src/launch/activeProfile';
+import { getActiveProfileName, resolvedProfileName, resolveActiveProfile, setActiveProfileName } from '../../../src/launch/activeProfile';
 import type { LaunchProfile } from '../../../src/launch/launchSettings';
 
 const p = (name: string, supported = true): LaunchProfile => ({ name, commandName: supported ? 'Project' : 'IISExpress', supported, environmentVariables: {} });
@@ -19,5 +19,13 @@ describe('activeProfile', () => {
     expect(getActiveProfileName(ws, '/a.csproj')).toBe('x');
     expect(getActiveProfileName(ws, '/b.csproj')).toBeUndefined();
     expect(m.has('cw.launchProfile:/a.csproj')).toBe(true);
+  });
+
+  it('resolvedProfileName hides deleted and unsupported stored names', () => {
+    const text = '{"profiles":{"iis":{"commandName":"IISExpress"},"a":{"commandName":"Project"}}}';
+    expect(resolvedProfileName(text, 'gone')).toBe('a');
+    expect(resolvedProfileName(text, 'iis')).toBe('a');
+    expect(resolvedProfileName(undefined, 'a')).toBeUndefined();
+    expect(resolvedProfileName('{"profiles":{"iis":{"commandName":"IISExpress"}}}', 'iis')).toBeUndefined();
   });
 });

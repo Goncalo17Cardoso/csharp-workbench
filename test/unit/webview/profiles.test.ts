@@ -70,4 +70,41 @@ describe('profiles view', () => {
     (root.querySelector('#profile-active') as HTMLButtonElement).click();
     expect(send).toHaveBeenLastCalledWith({ type: 'setActiveProfile', name: 'b' });
   });
+
+  it('a model arriving while typing keeps the value and focus', () => {
+    const root = document.createElement('div');
+    document.body.append(root);
+    const view = renderProfiles(root, {}, vi.fn());
+    const model: LaunchProfilesView = { profiles: [prof({ name: 'a', launchUrl: 'x' })], path: '/p', exists: true };
+    view.update(model);
+    const i = root.querySelector('#pf-launchUrl') as HTMLInputElement;
+    i.focus();
+    i.value = 'typed';
+    view.update(model);
+    const again = root.querySelector('#pf-launchUrl') as HTMLInputElement;
+    expect(again.value).toBe('typed');
+    expect(document.activeElement).toBe(again);
+  });
+
+  it('after Rename the renamed profile stays selected', () => {
+    const root = document.createElement('div');
+    document.body.append(root);
+    const view = renderProfiles(root, {}, vi.fn());
+    const profiles = [prof({ name: 'a' }), prof({ name: 'b' })];
+    view.update({ profiles, path: '/p', exists: true, active: 'a' });
+    const sel = root.querySelector('#profile-select') as HTMLSelectElement;
+    sel.value = 'b'; fire(sel, 'change');
+    (root.querySelector('#profile-name') as HTMLInputElement).value = 'z';
+    (root.querySelector('#profile-rename') as HTMLButtonElement).click();
+    view.update({ profiles: [prof({ name: 'a' }), prof({ name: 'z' })], path: '/p', exists: true, active: 'a' });
+    expect((root.querySelector('#profile-select') as HTMLSelectElement).value).toBe('z');
+  });
+
+  it('an invalid file shows a banner and disables the actions', () => {
+    const root = document.createElement('div');
+    document.body.append(root);
+    renderProfiles(root, {}, vi.fn()).update({ profiles: [], path: '/p', exists: true, invalid: 'bad json' });
+    expect(root.textContent).toContain('bad json');
+    expect((root.querySelector('#profile-new') as HTMLButtonElement).disabled).toBe(true);
+  });
 });

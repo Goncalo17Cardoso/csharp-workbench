@@ -119,13 +119,13 @@ describe('writeSolutionAtomically (fake deps)', () => {
 
   it('refuses a read-only file without writing', async () => {
     const { deps, calls } = fakeDeps({ [P]: 'old' }, { writable: false });
-    await expect(writeSolutionAtomically(P, 'new', deps, 'old')).rejects.toThrow(`Solution file is read-only: ${P}`);
+    await expect(writeSolutionAtomically(P, 'new', deps, 'old')).rejects.toThrow(`File is read-only: ${P}`);
     expect(calls.filter((c) => !c.startsWith('read'))).toEqual([]);
   });
 
   it('refuses when the file changed on disk since the caller read it', async () => {
     const { deps, files, calls } = fakeDeps({ [P]: 'changed' });
-    await expect(writeSolutionAtomically(P, 'new', deps, 'old')).rejects.toThrow('Solution file changed on disk; reload and try again.');
+    await expect(writeSolutionAtomically(P, 'new', deps, 'old')).rejects.toThrow('File changed on disk; reload and try again.');
     expect(calls).toEqual([`read ${P}`]);
     expect([...files]).toEqual([[P, 'changed']]);
   });
@@ -201,7 +201,7 @@ describe('writeSolutionAtomically (real files)', () => {
     const p = path.join(dir, 'ReadOnly.sln');
     await fs.writeFile(p, 'old');
     await fs.chmod(p, 0o444);
-    await expect(writeSolutionAtomically(p, 'new', deps(), 'old')).rejects.toThrow(`Solution file is read-only: ${p}`);
+    await expect(writeSolutionAtomically(p, 'new', deps(), 'old')).rejects.toThrow(`File is read-only: ${p}`);
     expect(await fs.readFile(p, 'utf8')).toBe('old');
     expect(await leftovers()).toEqual([]);
   });
@@ -209,7 +209,7 @@ describe('writeSolutionAtomically (real files)', () => {
   it('refuses when the file changed on disk, writing nothing', async () => {
     const p = path.join(dir, 'Changed.sln');
     await fs.writeFile(p, 'changed by someone else');
-    await expect(writeSolutionAtomically(p, 'new', deps(), 'old')).rejects.toThrow('Solution file changed on disk; reload and try again.');
+    await expect(writeSolutionAtomically(p, 'new', deps(), 'old')).rejects.toThrow('File changed on disk; reload and try again.');
     expect(await fs.readFile(p, 'utf8')).toBe('changed by someone else');
     expect(await leftovers()).toEqual([]);
   });

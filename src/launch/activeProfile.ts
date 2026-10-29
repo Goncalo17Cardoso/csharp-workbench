@@ -1,5 +1,5 @@
 import type { Memento } from '../solution/state';
-import type { LaunchProfile } from './launchSettings';
+import { parseProfiles, type LaunchProfile } from './launchSettings';
 
 const key = (projectPath: string) => `cw.launchProfile:${projectPath}`;
 
@@ -13,4 +13,9 @@ export const setActiveProfileName = (ws: Memento, projectPath: string, name: str
 export function resolveActiveProfile(profiles: LaunchProfile[], stored: string | undefined): LaunchProfile | undefined {
   const supported = profiles.filter((p) => p.supported);
   return supported.find((p) => p.name === stored) ?? supported[0];
+}
+
+/** Name of the profile Run/Debug will use for this launchSettings.json text, or undefined when none is supported. */
+export function resolvedProfileName(text: string | undefined, stored: string | undefined): string | undefined {
+  return resolveActiveProfile(parseProfiles(text), stored)?.name;
 }

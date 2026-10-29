@@ -3,7 +3,7 @@ import type { PropertyEdit } from './csprojEdit';
 import type { LaunchProfile, ProfileAction } from '../launch/launchSettings';
 import type { PropertiesModel } from './model';
 
-export interface LaunchProfilesView { profiles: LaunchProfile[]; active?: string; path: string; exists: boolean }
+export interface LaunchProfilesView { profiles: LaunchProfile[]; active?: string; path: string; exists: boolean; invalid?: string }
 
 export type PropsToHost =
   | { type: 'ready' }

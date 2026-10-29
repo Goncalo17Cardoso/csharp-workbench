@@ -6,7 +6,7 @@ import { launchSettingsPath, parseProfiles, type LaunchProfile } from '../../lau
 import type { DotnetCli } from '../../dotnet/cli';
 import type { TreeNode } from '../model';
 import { readProjectInfo } from '../projectInfo';
-import { createEndWaiter, debugConfigFor, dotnetTask, runTfm, targetPathStep, type TaskKind } from '../runCore';
+import { createEndWaiter, debugConfigFor, dotnetTask, executableRun, profileDebugConfigs, runTfm, targetPathStep, type TaskKind } from '../runCore';
 import { loadSolution } from '../slnParse';
 import type { SolutionTreeProvider } from '../SolutionTreeProvider';
 import { getStartupProject, setStartupProject } from '../state';
@@ -101,8 +101,18 @@ export function registerRunCommands(deps: Deps): vscode.Disposable[] {
   async function runProject(project: string | undefined): Promise<void> {
     if (!project) return;
     try {
+      const profile = await activeProfileOf(project);
+      if (profile?.commandName === 'Executable') {
+        const spec = executableRun(profile, path.dirname(project), process.env);
+        if (!spec.file) { fail(new Error(vscode.l10n.t('The launch profile has no executable path.'))); return; }
+        await vscode.tasks.executeTask(new vscode.Task(
+          { type: 'csharpWorkbench', kind: 'run', target: project }, vscode.TaskScope.Workspace, spec.name, 'C# Workbench',
+          new vscode.ProcessExecution(spec.file, spec.args, { cwd: spec.cwd, env: spec.env }),
+        ));
+        return;
+      }
       const tfm = runTfm(await tfmsOf(project));
-      await runTask('run', project, false, tfm, (await activeProfileOf(project))?.name);
+      await runTask('run', project, false, tfm, profile?.name);
     } catch (e) { fail(e); }
   }
 
@@ -147,13 +157,7 @@ export function registerRunCommands(deps: Deps): vscode.Disposable[] {
       const sln = solutionPath();
       const proj = sln ? getStartupProject(ws, sln) : undefined;
       if (!proj) return [];
-      const supported = (await profilesOf(proj)).filter((p) => p.supported);
-      if (!supported.length) return [{ ...debugConfigFor(proj, '', projName(proj)), program: '', csharpWorkbenchProject: proj }];
-      return supported.map((p) => {
-        const exe = p.commandName === 'Executable' && !!p.executablePath;
-        const c = debugConfigFor(proj, '', `${projName(proj)} (${p.name})`, p, process.env);
-        return { ...c, ...(exe ? {} : { program: '' }), csharpWorkbenchProject: proj, ...(exe ? { csharpWorkbenchKeepProgram: true } : {}) };
-      });
+      return profileDebugConfigs(proj, projName(proj), await profilesOf(proj), process.env);
     },
     async resolveDebugConfigurationWithSubstitutedVariables(_f, config) {
       const proj = config.csharpWorkbenchProject as string | undefined;

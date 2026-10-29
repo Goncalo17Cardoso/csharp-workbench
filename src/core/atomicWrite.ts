@@ -46,7 +46,7 @@ export const nodeTextFs: TextFs = {
 };
 
 export class ChangedOnDiskError extends Error {
-  constructor(message = 'Solution file changed on disk; reload and try again.') {
+  constructor(message = 'File changed on disk; reload and try again.') {
     super(message);
     this.name = 'ChangedOnDiskError';
   }
@@ -94,7 +94,7 @@ export async function writeTextAtomically(
   expectedOriginal: string,
 ): Promise<void> {
   const target = await deps.realpath(path);
-  if (!(await deps.canWrite(target))) throw new ReadOnlyFileError(`Solution file is read-only: ${path}`);
+  if (!(await deps.canWrite(target))) throw new ReadOnlyFileError(`File is read-only: ${path}`);
   const original = await deps.readFile(target);
   if (original !== expectedOriginal) throw new ChangedOnDiskError();
   const mode = await deps.mode(target);
@@ -112,14 +112,14 @@ export async function writeTextAtomically(
     throw e;
   }
   try {
-    if ((await deps.readFile(target)) !== newText) throw new Error(`Solution file did not read back as written: ${path}`);
+    if ((await deps.readFile(target)) !== newText) throw new Error(`File did not read back as written: ${path}`);
     await deps.validate();
   } catch (failure) {
     try {
       await replaceFile(target, original, mode, deps);
     } catch (restoreError) {
       throw new Error(
-        `Solution edit failed (${message(failure)}) and restoring the original ${path} failed (${message(restoreError)}); ` +
+        `Edit failed (${message(failure)}) and restoring the original ${path} failed (${message(restoreError)}); ` +
           `the original is kept in ${bak}`,
       );
     }

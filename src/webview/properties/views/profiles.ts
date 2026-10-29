@@ -36,6 +36,23 @@ export function renderProfiles(
   const act = (action: ProfileAction): void => send({ type: 'profiles', action });
 
   function update(model: LaunchProfilesView): void {
+    // Keep what the user is typing and where the focus is across the rebuild.
+    const focused = root.contains(document.activeElement) ? (document.activeElement as HTMLInputElement) : undefined;
+    const keep = focused?.id ? { id: focused.id, value: focused.value, start: focused.selectionStart, end: focused.selectionEnd } : undefined;
+    const nameKept = (root.querySelector('#profile-name') as HTMLInputElement | null)?.value;
+    render(model);
+    if (nameKept) (root.querySelector('#profile-name') as HTMLInputElement).value = nameKept;
+    if (keep) {
+      const again = root.querySelector<HTMLInputElement>(`#${keep.id}`);
+      if (again && !again.disabled) {
+        if (keep.id !== 'profile-select') again.value = keep.value;
+        again.focus();
+        if (keep.start !== null && keep.end !== null) try { again.setSelectionRange(keep.start, keep.end); } catch { /* not a text input */ }
+      }
+    }
+  }
+
+  function render(model: LaunchProfilesView): void {
     root.textContent = '';
     root.classList.add('profiles');
     const { profiles } = model;
@@ -43,6 +60,8 @@ export function renderProfiles(
     const cur = profiles.find((p) => p.name === selected);
 
     root.append(el('h3', undefined, L('Launch profiles')));
+    if (model.invalid) root.append(el('div', 'banner banner-vulnerable', model.invalid));
+    const locked = readOnly || !!model.invalid;
     if (!model.exists) root.append(el('p', 'muted', L('launchSettings.json is created when you add the first profile.')));
 
     const bar = el('div', 'profiles-bar');
@@ -55,22 +74,22 @@ export function renderProfiles(
     }
     if (cur) sel.value = cur.name;
     sel.disabled = profiles.length === 0;
-    sel.addEventListener('change', () => { selected = sel.value; update(model); });
+    sel.addEventListener('change', () => { selected = sel.value; render(model); });
     bar.append(sel);
 
     const nameIn = el('input');
     nameIn.type = 'text';
     nameIn.id = 'profile-name';
     nameIn.placeholder = L('Profile name');
-    nameIn.disabled = readOnly;
+    nameIn.disabled = locked;
     const kind = el('select');
     kind.id = 'profile-kind';
     for (const k of ['Project', 'Executable'] as const) { const o = el('option', undefined, L(k)); o.value = k; kind.append(o); }
-    kind.disabled = readOnly;
+    kind.disabled = locked;
     const btn = (id: string, text: string, off: boolean, fn: () => void): HTMLButtonElement => {
       const b = el('button', undefined, L(text));
       b.id = id;
-      b.disabled = readOnly || off;
+      b.disabled = locked || off;
       b.addEventListener('click', fn);
       return b;
     };
@@ -79,17 +98,17 @@ export function renderProfiles(
       nameIn, kind,
       btn('profile-new', 'New profile', false, () => act({ kind: 'new', name: name(), commandName: kind.value as 'Project' | 'Executable' })),
       btn('profile-dup', 'Duplicate', !cur, () => act({ kind: 'duplicate', from: cur!.name, name: name() })),
-      btn('profile-rename', 'Rename', !cur, () => act({ kind: 'rename', from: cur!.name, name: name() })),
+      btn('profile-rename', 'Rename', !cur, () => { selected = name(); act({ kind: 'rename', from: cur!.name, name: name() }); }),
       btn('profile-delete', 'Delete', !cur, () => act({ kind: 'delete', name: cur!.name })),
       btn('profile-active', 'Set as active', !cur || !cur.supported || cur.name === model.active, () => send({ type: 'setActiveProfile', name: cur!.name })),
     );
     root.append(bar);
-    if (cur) root.append(editor(cur));
+    if (cur) root.append(editor(cur, locked));
   }
 
-  function editor(p: LaunchProfile): HTMLElement {
+  function editor(p: LaunchProfile, locked: boolean): HTMLElement {
     const box = el('div', 'profile-editor');
-    const off = readOnly || !p.supported;
+    const off = locked || !p.supported;
     if (!p.supported) box.append(el('p', 'muted', L('Not supported on this system')));
     box.append(row(L('Command'), el('span', undefined, p.commandName)));
     for (const { field, label } of FIELDS[p.commandName] ?? []) {

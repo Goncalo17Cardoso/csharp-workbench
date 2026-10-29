@@ -69,6 +69,32 @@ export function debugConfigFor(
   return config;
 }
 
+/** Pure description of running an Executable launch profile (Run); the same expansion rules as Debug. */
+export function executableRun(
+  profile: LaunchProfile, projectDir: string, env: Record<string, string | undefined> = {},
+): { name: string; file: string; args: string[]; cwd: string; env: Record<string, string> } {
+  const file = expandEnv(profile.executablePath ?? '', env);
+  const penv: Record<string, string> = {};
+  for (const [k, v] of Object.entries(profile.environmentVariables)) penv[k] = expandEnv(v, env);
+  return {
+    name: `Run ${profile.name}`, file,
+    args: profile.commandLineArgs ? splitArgs(profile.commandLineArgs) : [],
+    cwd: profile.workingDirectory ? path.resolve(projectDir, expandEnv(profile.workingDirectory, env)) : projectDir,
+    env: penv,
+  };
+}
+
+/** Per-profile debug configurations of the dynamic provider (one per supported profile). */
+export function profileDebugConfigs(proj: string, name: string, profiles: LaunchProfile[], env: Record<string, string | undefined>): DebugConfig[] {
+  const supported = profiles.filter((p) => p.supported);
+  if (!supported.length) return [{ ...debugConfigFor(proj, '', name), program: '', csharpWorkbenchProject: proj }];
+  return supported.map((p) => {
+    const exe = p.commandName === 'Executable' && !!p.executablePath;
+    const c = debugConfigFor(proj, '', `${name} (${p.name})`, p, env);
+    return { ...c, ...(exe ? { csharpWorkbenchKeepProgram: true } : { program: '' }), csharpWorkbenchProject: proj };
+  });
+}
+
 /** Decides what to do with a `TargetPath` evaluation: use it, retry with the first TFM, or give up. */
 export function targetPathStep(output: string, tfms: readonly string[]):
   { kind: 'path'; path: string } | { kind: 'retry'; tfm: string } | { kind: 'fail' } {
