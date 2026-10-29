@@ -152,7 +152,7 @@ export function planSync(files: SyncInputFile[]): SyncPlan {
         const cand = targets.filter((t) => !own.has(t) && !imported.has(t));
         if (cand.length === 0) {
           const { lineStart, indent, alone } = indentOf(u);
-          const after = /^[ \t]*(\r\n|\n|\r)/.exec(text.slice(u.end));
+          const after = /^[ \t]*(\/\/[^\r\n]*)?(\r\n|\n|\r|$)/.exec(text.slice(u.end));
           const whole = alone && after;
           const edit = { start: whole ? lineStart : u.start, end: whole ? u.end + after![0].length : u.end, newText: '' };
           add(f.path, edit);
@@ -195,7 +195,7 @@ export function planSync(files: SyncInputFile[]): SyncPlan {
       } else {
         const ns = info.namespaces.find((n) => n.depth === 0);
         if (ns) {
-          const kw = text.lastIndexOf('namespace', ns.nameStart);
+          const kw = info.firstHeaderStart ?? text.lastIndexOf('namespace', ns.nameStart);
           const ls = Math.max(text.lastIndexOf('\n', kw - 1), text.lastIndexOf('\r', kw - 1)) + 1;
           let pos = /^[ \t]*$/.test(text.slice(ls, kw)) ? ls : kw;
           if (pos === 0 && text.charCodeAt(0) === 0xfeff) pos = 1;
@@ -209,6 +209,15 @@ export function planSync(files: SyncInputFile[]): SyncPlan {
     }
   }
 
-  for (const list of plan.edits.values()) list.sort((a, b) => a.start - b.start || a.end - b.end);
+  for (const [path, list] of plan.edits) {
+    list.sort((a, b) => a.start - b.start || a.end - b.end); // stable: equal offsets keep insertion order
+    const merged: TextEdit[] = [];
+    for (const e of list) {
+      const last = merged[merged.length - 1];
+      if (last && last.start === last.end && e.start === e.end && last.start === e.start) last.newText += e.newText;
+      else merged.push(e);
+    }
+    plan.edits.set(path, merged);
+  }
   return plan;
 }

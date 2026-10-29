@@ -211,4 +211,43 @@ describe('planSync', () => {
     expect(replan(files, plan).edits.size).toBe(0);
   });
 
+
+  it('usings go before assembly attributes (block form)', () => {
+    const files = [
+      f('Domain/C.cs', 'namespace MyApp.Models;\nclass C {}\n'),
+      f('Models/D.cs', '// header\n[assembly: System.CLSCompliant(true)]\nnamespace MyApp.Models\n{\n  class D {}\n}\n'),
+    ];
+    const { plan, out } = run(files);
+    expect(out(1)).toBe('// header\nusing MyApp.Domain;\n\n[assembly: System.CLSCompliant(true)]\nnamespace MyApp.Models\n{\n  class D {}\n}\n');
+    expect(replan(files, plan).edits.size).toBe(0);
+  });
+
+  it('usings go before extern alias and attributes (file-scoped form)', () => {
+    const files = [
+      f('Domain/C.cs', 'namespace MyApp.Models;\nclass C {}\n'),
+      f('Models/D.cs', 'extern alias Z;\n[module: System.CLSCompliant(true)]\nnamespace MyApp.Models;\nclass D {}\n'),
+    ];
+    const { plan, out } = run(files);
+    expect(out(1).startsWith('using MyApp.Domain;\n\nextern alias Z;\n[module:')).toBe(true);
+    expect(replan(files, plan).edits.size).toBe(0);
+  });
+
+  it('two inserts at the same offset merge into one edit in a fixed order', () => {
+    const files = [
+      f('A/X.cs', 'namespace Old1;\nclass X {}\n'), f('B/Y.cs', 'namespace Old1;\nclass Y {}\n'),
+      f('C/Z.cs', 'namespace Old2;\nclass Z {}\n'),
+      f('P.cs', 'using Old1;\nnamespace Old2 { }\n', false),
+    ];
+    const { plan, out } = run(files);
+    expect(out(3)).toBe('using MyApp.A;\nusing MyApp.B;\nusing MyApp.C;\nnamespace Old2 { }\n');
+    expect(plan.edits.get(files[3].path)).toHaveLength(2); // name replacement + one merged insert
+  });
+
+  it('deleting a using with a trailing comment removes the whole line', () => {
+    const { out } = run([
+      f('Domain/C.cs', 'namespace MyApp.Models;\nclass C {}\n'),
+      f('P.cs', 'using MyApp.Domain;\nusing MyApp.Models; // old\nclass P {}\n', false),
+    ]);
+    expect(out(1)).toBe('using MyApp.Domain;\nclass P {}\n');
+  });
 });
