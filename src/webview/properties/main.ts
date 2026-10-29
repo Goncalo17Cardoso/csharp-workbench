@@ -1,6 +1,6 @@
 import '../styles.css';
 import './properties.css';
-import type { PropsToHost, PropsToWebview } from '../../properties/protocol';
+import type { LaunchProfilesView, PropsToHost, PropsToWebview } from '../../properties/protocol';
 import { renderProperties } from './views/form';
 
 declare function acquireVsCodeApi(): { postMessage(m: PropsToHost): void };
@@ -12,6 +12,8 @@ const banner = document.createElement('div');
 const form = document.createElement('div');
 app.append(banner, form);
 let labels: Record<string, string> = {};
+let api: ReturnType<typeof renderProperties> | undefined;
+let profiles: LaunchProfilesView | undefined;
 const L = (k: string): string => labels[k] ?? k;
 
 window.addEventListener('message', (e: MessageEvent<PropsToWebview>) => {
@@ -23,7 +25,12 @@ window.addEventListener('message', (e: MessageEvent<PropsToWebview>) => {
     case 'model':
       labels = m.labels;
       banner.textContent = '';
-      renderProperties(form, m.model, labels, send);
+      api = renderProperties(form, m.model, labels, send);
+      if (profiles) api.setProfiles(profiles);
+      break;
+    case 'profilesModel':
+      profiles = m.model;
+      api?.setProfiles(m.model);
       break;
     case 'saved':
       banner.textContent = '';

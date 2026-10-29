@@ -49,5 +49,6 @@
   "viewsContainers.solutionExplorer.title": "Solution Explorer",
   "views.solutionExplorer.name": "Solution Explorer",
   "command.projectProperties.title": "Properties",
-  "command.projectProperties.save.title": "Save Project Properties"
+  "command.projectProperties.save.title": "Save Project Properties",
+  "command.selectLaunchProfile.title": "Select Launch Profile..."
 }

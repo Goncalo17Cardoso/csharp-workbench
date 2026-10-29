@@ -2,6 +2,7 @@ import * as fsp from 'node:fs/promises';
 import * as path from 'node:path';
 import * as vscode from 'vscode';
 import type { DotnetCli } from '../dotnet/cli';
+import { getActiveProfileName } from '../launch/activeProfile';
 import { readPackageRefs } from '../workspace/projectFiles';
 import type { TreeNode } from './model';
 import { readProjectInfo } from './projectInfo';
@@ -215,7 +216,7 @@ export class SolutionTreeProvider implements vscode.TreeDataProvider<TreeNode>, 
       if (icon) item.iconPath = new vscode.ThemeIcon(icon);
     }
     if (node.missing) item.iconPath = new vscode.ThemeIcon('warning');
-    item.description = node.contextValue.endsWith('.startup') ? vscode.l10n.t('(startup)')
+    item.description = node.contextValue.endsWith('.startup') ? (getActiveProfileName(this.ws, node.projectPath ?? '') ?? vscode.l10n.t('(startup)'))
       : node.missing ? vscode.l10n.t('missing')
       : node.contextValue.endsWith('.excluded') ? vscode.l10n.t('excluded') : node.description;
     if (node.kind === 'warning') item.tooltip = node.description;

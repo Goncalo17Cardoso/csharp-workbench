@@ -1,9 +1,11 @@
 import * as fsp from 'node:fs/promises';
 import * as path from 'node:path';
 import * as vscode from 'vscode';
+import { getActiveProfileName, setActiveProfileName } from '../launch/activeProfile';
 import { nodeTextFs } from '../core/atomicWrite';
 import type { DotnetCli } from '../dotnet/cli';
 import type { TreeNode } from '../solution/model';
+import { confirmAction } from '../solution/confirm';
 import { loadSolution } from '../solution/slnParse';
 import type { SolutionTreeProvider } from '../solution/SolutionTreeProvider';
 import { PropertiesController } from './controller';
@@ -11,6 +13,7 @@ import { scanCsproj } from './csprojScan';
 import { PropertiesPanel } from './PropertiesPanel';
 
 interface Deps {
+  ws: vscode.Memento;
   extensionUri: vscode.Uri;
   provider: SolutionTreeProvider;
   getCli(): Promise<DotnetCli | undefined>;
@@ -58,6 +61,24 @@ export function registerPropertiesCommands(deps: Deps): vscode.Disposable[] {
       readText,
       getProperties: (p, names) => cli.getProperties(p, names),
       writer: nodeTextFs,
+      launch: {
+        read: async (p) => {
+          try { return await fsp.readFile(p, 'utf8'); } catch (e) {
+            if ((e as NodeJS.ErrnoException).code === 'ENOENT') return undefined;
+            throw e;
+          }
+        },
+        create: async (p, text) => {
+          await fsp.mkdir(path.dirname(p), { recursive: true });
+          await fsp.writeFile(p, text, { encoding: 'utf8', flag: 'wx' });
+        },
+        confirmDelete: (name) => confirmAction(vscode.l10n.t('Delete profile {0}?', name), undefined, vscode.l10n.t('Delete')),
+        getActive: () => getActiveProfileName(deps.ws, project),
+        setActive: async (name) => {
+          await setActiveProfileName(deps.ws, project, name);
+          void vscode.commands.executeCommand('csharpWorkbench.refresh');
+        },
+      },
       post: (m) => panel.post(m),
       onSecrets: () => void vscode.commands.executeCommand('csharpWorkbench.manageUserSecrets', { kind: 'project', path: project }),
       openAt: (property) => void openAt(project, property),

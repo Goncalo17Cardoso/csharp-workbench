@@ -246,6 +246,11 @@
         "category": "C# Workbench"
       },
       {
+        "command": "csharpWorkbench.selectLaunchProfile",
+        "title": "%command.selectLaunchProfile.title%",
+        "category": "C# Workbench"
+      },
+      {
         "command": "csharpWorkbench.runStartup",
         "title": "%command.runStartup.title%",
         "category": "C# Workbench",
@@ -604,6 +609,11 @@
           "command": "csharpWorkbench.setStartupProject",
           "when": "csharpWorkbench.hasSolution && viewItem =~ /^cw\\.project$/",
           "group": "3_run@2"
+        },
+        {
+          "command": "csharpWorkbench.selectLaunchProfile",
+          "when": "viewItem =~ /^cw\\.project\\.startup$/",
+          "group": "3_run@3"
         },
         {
           "command": "csharpWorkbench.buildSolution",

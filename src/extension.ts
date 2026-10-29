@@ -170,6 +170,7 @@ export function activate(context: vscode.ExtensionContext): ExtensionApi | undef
   }));
 
   context.subscriptions.push(...registerPropertiesCommands({
+    ws: context.workspaceState,
     extensionUri: context.extensionUri,
     provider: explorer,
     getCli: async () => { const d = await resolveDotnet(); return d ? new DotnetCli(nodeExec, d, output) : undefined; },

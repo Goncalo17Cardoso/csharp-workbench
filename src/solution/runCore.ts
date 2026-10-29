@@ -1,4 +1,5 @@
 import * as path from 'node:path';
+import type { LaunchProfile } from '../launch/launchSettings';
 
 export type TaskKind = 'build' | 'rebuild' | 'clean' | 'run';
 
@@ -6,7 +7,7 @@ const isSolution = (p: string) => /\.slnx?$/i.test(p);
 const baseName = (p: string) => path.basename(p).replace(/\.(csproj|slnx?)$/i, '');
 
 /** Pure description of a dotnet task. `tfm` (build/rebuild only) pins the framework of a multi-target project. */
-export function dotnetTask(kind: TaskKind, target: string, _dotnet: string, tfm?: string): { name: string; args: string[] } {
+export function dotnetTask(kind: TaskKind, target: string, _dotnet: string, tfm?: string, launchProfile?: string): { name: string; args: string[] } {
   const n = baseName(target);
   const label = isSolution(target) ? `Solution '${n}'` : n;
   const f = tfm ? ['-f', tfm] : [];
@@ -14,15 +15,58 @@ export function dotnetTask(kind: TaskKind, target: string, _dotnet: string, tfm?
     case 'build': return { name: `Build ${label}`, args: ['build', target, ...f] };
     case 'rebuild': return { name: `Rebuild ${label}`, args: ['build', target, '--no-incremental', ...f] };
     case 'clean': return { name: `Clean ${label}`, args: ['clean', target] };
-    case 'run': return { name: `Run ${label}`, args: ['run', '--project', target, ...f] };
+    case 'run': return { name: `Run ${label}`, args: ['run', '--project', target, ...f, ...(launchProfile ? ['--launch-profile', launchProfile] : [])] };
   }
 }
 
-export function debugConfigFor(projectPath: string, targetPath: string, name: string) {
-  return {
+/** Expands %VAR%, $VAR and ${VAR}; unknown variables become ''. */
+export function expandEnv(value: string, env: Record<string, string | undefined>): string {
+  return value.replace(/%([^%]+)%|\$\{([^}]+)\}|\$([A-Za-z_][A-Za-z0-9_]*)/g, (_m, a?: string, b?: string, c?: string) => env[(a ?? b ?? c)!] ?? '');
+}
+
+/** Splits a command line like a shell would, honouring quotes, without any expansion. */
+export function splitArgs(line: string): string[] {
+  const out: string[] = [];
+  let cur = '';
+  let has = false;
+  let quote: string | undefined;
+  for (const ch of line) {
+    if (quote) {
+      if (ch === quote) quote = undefined; else cur += ch;
+    } else if (ch === '"' || ch === "'") { quote = ch; has = true; }
+    else if (/\s/.test(ch)) { if (has || cur) out.push(cur); cur = ''; has = false; }
+    else cur += ch;
+  }
+  if (has || cur) out.push(cur);
+  return out;
+}
+
+export interface DebugConfig { type: string; request: string; name: string; [key: string]: unknown }
+
+export function debugConfigFor(
+  projectPath: string, targetPath: string, name: string,
+  profile?: LaunchProfile, env: Record<string, string | undefined> = {},
+): DebugConfig {
+  const projDir = path.dirname(projectPath);
+  const base: DebugConfig = {
     type: 'coreclr', request: 'launch', name: `C# Workbench: ${name}`, program: targetPath,
-    cwd: path.dirname(projectPath), console: 'integratedTerminal', stopAtEntry: false,
+    cwd: projDir, console: 'integratedTerminal', stopAtEntry: false,
   };
+  if (!profile) return base;
+  const config: DebugConfig = { ...base };
+  if (profile.commandName === 'Executable' && profile.executablePath) config.program = expandEnv(profile.executablePath, env);
+  if (profile.commandLineArgs) config.args = splitArgs(profile.commandLineArgs);
+  const penv: Record<string, string> = {};
+  for (const [k, v] of Object.entries(profile.environmentVariables)) penv[k] = expandEnv(v, env);
+  if (profile.commandName === 'Project' && profile.applicationUrl) penv.ASPNETCORE_URLS = profile.applicationUrl;
+  if (Object.keys(penv).length) config.env = penv;
+  if (profile.workingDirectory) config.cwd = path.resolve(projDir, expandEnv(profile.workingDirectory, env));
+  if (profile.launchBrowser) {
+    config.serverReadyAction = {
+      action: 'openExternally', pattern: '\\bNow listening on:\\s+(https?://\\S+)', uriFormat: '%s/' + (profile.launchUrl ?? ''),
+    };
+  }
+  return config;
 }
 
 /** Decides what to do with a `TargetPath` evaluation: use it, retry with the first TFM, or give up. */

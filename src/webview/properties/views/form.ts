@@ -1,7 +1,8 @@
 // Project Properties form: left nav of sections, right form of fields with badges and validation.
 import type { PropertyEdit } from '../../../properties/csprojEdit';
 import type { FieldState, PropertiesModel } from '../../../properties/model';
-import type { PropsToHost } from '../../../properties/protocol';
+import type { LaunchProfilesView, PropsToHost } from '../../../properties/protocol';
+import { renderProfiles } from './profiles';
 import { FIELDS, validateTfm, type FieldDef, type SectionId } from '../../../properties/schema';
 
 const SECTIONS: { id: SectionId; name: string }[] = [
@@ -31,7 +32,7 @@ export function renderProperties(
   model: PropertiesModel,
   labels: Record<string, string>,
   send: (m: PropsToHost) => void,
-): { collectEdits(): PropertyEdit[] } {
+): { collectEdits(): PropertyEdit[]; setProfiles(m: LaunchProfilesView): void } {
   const L = (k: string): string => labels[k] ?? k;
   root.textContent = '';
   root.classList.add('props');
@@ -240,7 +241,9 @@ export function renderProperties(
   }
 
   const debugPane = sections.get('debug')!;
-  debugPane.append(el('p', 'muted', L('Debug profiles are not available yet.')));
+  const profilesHost = el('div');
+  debugPane.append(profilesHost);
+  const profiles = renderProfiles(profilesHost, labels, send);
   const secretsBtn = el('button', undefined, L('Manage user secrets'));
   secretsBtn.disabled = ro;
   secretsBtn.addEventListener('click', () => send({ type: 'manageSecrets' }));
@@ -248,5 +251,5 @@ export function renderProperties(
 
   select('application');
   save.disabled = true;
-  return { collectEdits };
+  return { collectEdits, setProfiles: (m) => profiles.update(m) };
 }

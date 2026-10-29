@@ -1,11 +1,25 @@
 // Host-side logic of the Project Properties panel. Pure: no vscode import.
-import { ChangedOnDiskError } from '../core/atomicWrite';
+import { ChangedOnDiskError, writeTextAtomically } from '../core/atomicWrite';
+import { resolveActiveProfile } from '../launch/activeProfile';
+import { applyProfileAction, launchSettingsPath, parseProfiles, ProfileError, type ProfileAction } from '../launch/launchSettings';
 import { loadProperties, saveProperties, type PropertiesDeps, type PropertiesModel } from './model';
 import type { PropertyEdit } from './csprojEdit';
-import type { PropsToHost, PropsToWebview } from './protocol';
+import type { LaunchProfilesView, PropsToHost, PropsToWebview } from './protocol';
 import { FIELDS, validateIdentifierPath, validateTfm, validateVersion } from './schema';
 
+/** Access to launchSettings.json and the per-project active profile. */
+export interface LaunchDeps {
+  /** The file text, or undefined when it does not exist. */
+  read(path: string): Promise<string | undefined>;
+  /** Creates the file (and `Properties/`) exclusively; used for the first write only. */
+  create(path: string, text: string): Promise<void>;
+  confirmDelete(name: string): Promise<boolean>;
+  getActive(): string | undefined;
+  setActive(name: string | undefined): Promise<void>;
+}
+
 export interface ControllerDeps extends PropertiesDeps {
+  launch: LaunchDeps;
   post(m: PropsToWebview): void;
   onSecrets(): void;
   openAt(property: string): void;
@@ -16,7 +30,11 @@ const SECTIONS = ['Application', 'Build', 'Package', 'Assembly', 'Debug', 'Secre
 const UI = [
   'Save', 'Add', 'Reload', 'Reset', 'inherited', 'duplicate', 'set per configuration', 'Open in .csproj',
   'The project could not be evaluated, so it is read-only.', 'The project changed on disk.',
-  'Debug profiles are not available yet.', 'Manage user secrets',
+  'Manage user secrets',
+  'Launch profiles', 'New profile', 'Duplicate', 'Rename', 'Delete', 'Project', 'Executable', 'Name', 'Value',
+  'Command line arguments', 'Working directory', 'Application URL', 'Launch browser', 'Launch URL', 'Executable path',
+  'Environment variables', 'Add variable', 'Remove', 'Active profile', 'Set as active', 'Command',
+  'Not supported on this system', 'launchSettings.json is created when you add the first profile.', 'Profile name',
 ];
 
 /** English keys of every label the webview shows (field labels, sections, validator messages). */
@@ -32,6 +50,7 @@ export class PropertiesController {
   private isDirty = false;
   private saving = false;
   private edits: PropertyEdit[] = [];
+  private launchText: string | undefined;
 
   constructor(private readonly projectPath: string, private readonly deps: ControllerDeps) {}
 
@@ -67,6 +86,13 @@ export class PropertiesController {
       case 'save':
         await this.save(m.edits);
         return;
+      case 'profiles':
+        await this.profileAction(m.action);
+        return;
+      case 'setActiveProfile':
+        await this.deps.launch.setActive(m.name);
+        this.postProfiles();
+        return;
     }
   }
 
@@ -86,7 +112,66 @@ export class PropertiesController {
       this.deps.post({ type: 'model', model: this.model, labels });
     } catch (e) {
       this.deps.post({ type: 'error', message: msg(e) });
+      return;
     }
+    await this.loadProfiles();
+  }
+
+  private get launchPath(): string { return launchSettingsPath(this.projectPath); }
+
+  private async loadProfiles(): Promise<void> {
+    try {
+      this.launchText = await this.deps.launch.read(this.launchPath);
+      this.postProfiles();
+    } catch (e) {
+      this.deps.post({ type: 'error', message: msg(e) });
+    }
+  }
+
+  private postProfiles(): void {
+    const profiles = parseProfiles(this.launchText);
+    const model: LaunchProfilesView = {
+      profiles, path: this.launchPath, exists: this.launchText !== undefined,
+      ...(resolveActiveProfile(profiles, this.deps.launch.getActive()) ? { active: resolveActiveProfile(profiles, this.deps.launch.getActive())!.name } : {}),
+    };
+    this.deps.post({ type: 'profilesModel', model });
+  }
+
+  private async profileAction(action: ProfileAction): Promise<void> {
+    const { launch, t } = this.deps;
+    const fail = (message: string) => this.deps.post({ type: 'error', message });
+    try {
+      if (action.kind === 'delete' && !(await launch.confirmDelete(action.name))) { this.postProfiles(); return; }
+      const original = this.launchText;
+      let newText: string;
+      try {
+        newText = applyProfileAction(original, action);
+      } catch (e) {
+        if (!(e instanceof ProfileError)) throw e;
+        fail(t(e.code === 'exists' ? 'A profile with that name already exists.'
+          : e.code === 'missing' ? 'Profile not found.'
+          : e.code === 'emptyName' ? 'The profile name is empty.'
+          : 'launchSettings.json is not valid JSON; fix it and reload.'));
+        this.postProfiles();
+        return;
+      }
+      const verify = async (): Promise<void> => {
+        const text = await launch.read(this.launchPath);
+        const problem = checkApplied(parseProfiles(text), action);
+        if (problem) throw new Error(problem);
+      };
+      if (original === undefined) {
+        await launch.create(this.launchPath, newText);
+        await verify();
+      } else {
+        await writeTextAtomically(this.launchPath, newText, { ...this.deps.writer, validate: verify }, original);
+      }
+      if (action.kind === 'rename' && launch.getActive() === action.from) await launch.setActive(action.name);
+      if (action.kind === 'delete' && launch.getActive() === action.name) await launch.setActive(undefined);
+    } catch (e) {
+      fail(e instanceof ChangedOnDiskError ? t('launchSettings.json changed on disk; it was reloaded.') : msg(e));
+    }
+    await this.loadProfiles();
   }
 
   private async save(edits: PropertyEdit[]): Promise<boolean> {
@@ -109,6 +194,23 @@ export class PropertiesController {
       return false;
     } finally {
       this.saving = false;
+    }
+  }
+}
+
+/** Describes what is wrong when `profiles` (read back from disk) do not reflect `action`; undefined when fine. */
+export function checkApplied(profiles: ReturnType<typeof parseProfiles>, action: ProfileAction): string | undefined {
+  const find = (n: string) => profiles.find((p) => p.name === n);
+  const bad = (what: string) => `launchSettings.json does not contain the expected change (${what}).`;
+  switch (action.kind) {
+    case 'new': return find(action.name) ? undefined : bad(action.name);
+    case 'duplicate': return find(action.name) ? undefined : bad(action.name);
+    case 'rename': return find(action.name) && (action.name === action.from || !find(action.from)) ? undefined : bad(action.name);
+    case 'delete': return find(action.name) ? bad(action.name) : undefined;
+    case 'set': return find(action.name)?.[action.field] === action.value || (action.value === undefined && find(action.name) && find(action.name)![action.field] === undefined) ? undefined : bad(action.field);
+    case 'env': {
+      const got = find(action.name)?.environmentVariables;
+      return got && JSON.stringify(Object.entries(got).sort()) === JSON.stringify(Object.entries(action.env).sort()) ? undefined : bad('env');
     }
   }
 }
