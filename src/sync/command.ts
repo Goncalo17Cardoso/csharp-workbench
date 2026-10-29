@@ -8,7 +8,7 @@ import type { TreeNode } from '../solution/model';
 import { loadProjectItems } from '../solution/projectItems';
 import { loadSolution } from '../solution/slnParse';
 import type { SolutionTreeProvider } from '../solution/SolutionTreeProvider';
-import { chooseText, resolveRootNamespace, syncFileInput, syncItemRole } from './candidates';
+import { chooseText, projectScope, resolveRootNamespace, syncFileInput, syncItemRole } from './candidates';
 import { toWorkspaceEditSpec } from './editSpec';
 import { planSync, type SyncInputFile, type SyncPlan } from './plan';
 
@@ -51,14 +51,14 @@ export function registerSyncCommands(deps: Deps): vscode.Disposable[] {
     for (const project of projects) {
       if (token.isCancellationRequested) return undefined;
       const projectDir = path.dirname(project);
-      // The evaluated RootNamespace (Directory.Build.props, $(...)); the file name when it cannot be evaluated.
+      // The evaluated RootNamespace (Directory.Build.props, $(...)); without it the project is references-only.
       let evaluated: string | undefined;
       try { evaluated = (await cli.getProperties(project, ['RootNamespace'])).RootNamespace; } catch (e) {
         deps.output.info(`${project}: ${errText(e)}`);
       }
-      const rootNamespace = resolveRootNamespace(project, evaluated);
+      const { rootNamespace, inScope, unresolved } = projectScope(!scopeProject || path.resolve(project) === path.resolve(scopeProject), resolveRootNamespace(evaluated));
+      if (unresolved) deps.output.info(vscode.l10n.t('Sync Namespaces: the root namespace of {0} could not be evaluated; its namespace declarations are left unchanged.', project));
       const items = await loadProjectItems(project, cli, { readdir: (d) => fsp.readdir(d, { withFileTypes: true }) });
-      const inScope = !scopeProject || path.resolve(project) === path.resolve(scopeProject);
       for (const item of items.items) {
         const role = syncItemRole(projectDir, item);
         if (role === 'excluded') continue;
@@ -102,7 +102,11 @@ export function registerSyncCommands(deps: Deps): vscode.Disposable[] {
       if (!planned) return;
       const { plan, texts, generated } = planned;
       for (const g of generated) deps.output.info(`Sync Namespaces: skipped ${g} (generated)`);
-      for (const s of plan.skipped) deps.output.info(`Sync Namespaces: skipped ${s.path} (${s.reason})`);
+      for (const s of plan.skipped) {
+        deps.output.info(s.reason === 'partialSplit'
+          ? vscode.l10n.t('Sync Namespaces: skipped {0} (a partial type it declares is also declared in a file that keeps its namespace)', s.path)
+          : `Sync Namespaces: skipped ${s.path} (${s.reason})`);
+      }
       for (const a of plan.ambiguous) deps.output.info(`Sync Namespaces: ambiguous ${a.from}.${a.type} -> ${a.targets.join(', ')}`);
       const specs = toWorkspaceEditSpec(plan, texts);
       if (!specs.length) {

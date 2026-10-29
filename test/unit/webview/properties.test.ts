@@ -138,6 +138,17 @@ describe('properties form', () => {
     expect(send).toHaveBeenCalledWith({ type: 'openCsproj', property: 'PackageReleaseNotes' });
   });
 
+  it('an inherited multi-line value is read-only with a badge and Open in .csproj', () => {
+    const { root, send, api } = setup(model({ NoWarn: { origin: 'inherited', evaluated: 'CS1591;\r\nCS0618' } }), { 'multi-line': 'várias linhas' });
+    expect(input(root, 'NoWarn').disabled).toBe(true);
+    const row = input(root, 'NoWarn').closest('.props-field')!;
+    expect(row.textContent).toContain('várias linhas');
+    expect(row.querySelector('.props-reset')).toBeNull();
+    [...row.querySelectorAll<HTMLElement>('a, button')].find((b) => b.textContent === 'Open in .csproj')!.click();
+    expect(send).toHaveBeenCalledWith({ type: 'openCsproj', property: 'NoWarn' });
+    expect(api.collectEdits()).toEqual([]);
+  });
+
   it('shows the evaluated value under a project field when it differs from the text', () => {
     const { root } = setup(model({
       Version: { origin: 'project', raw: '$(BaseVersion)', evaluated: '2.1.0' },

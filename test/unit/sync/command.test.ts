@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { toWorkspaceEditSpec } from '../../../src/sync/editSpec';
-import { chooseText, hasGeneratedHeader, resolveRootNamespace, syncFileInput, syncItemRole } from '../../../src/sync/candidates';
+import { chooseText, hasGeneratedHeader, projectScope, resolveRootNamespace, syncFileInput, syncItemRole } from '../../../src/sync/candidates';
 import type { SyncPlan } from '../../../src/sync/plan';
 
 const plan = (path: string, edits: { start: number; end: number; newText: string; kind?: 'declaration' | 'using' | 'qualified' }[]): SyncPlan =>
@@ -75,10 +75,21 @@ describe('syncFileInput', () => {
 });
 
 describe('resolveRootNamespace', () => {
-  it('uses the evaluated value', () => expect(resolveRootNamespace('/p/My.App.csproj', 'Company.My.App')).toBe('Company.My.App'));
-  it('falls back to the project file name when empty or missing', () => {
-    expect(resolveRootNamespace('/p/My.App.csproj', '  ')).toBe('My.App');
-    expect(resolveRootNamespace('/p/My.App.CSPROJ', undefined)).toBe('My.App');
+  it('uses the evaluated value, trimmed', () => expect(resolveRootNamespace(' Company.My.App ')).toBe('Company.My.App'));
+  it('is undefined when empty or not evaluated: no file-name fallback', () => {
+    expect(resolveRootNamespace('  ')).toBeUndefined();
+    expect(resolveRootNamespace(undefined)).toBeUndefined();
+  });
+});
+
+describe('projectScope', () => {
+  it('a project without a root namespace is out of scope even when picked', () => {
+    expect(projectScope(true, undefined)).toEqual({ rootNamespace: '', inScope: false, unresolved: true });
+    expect(projectScope(false, undefined)).toEqual({ rootNamespace: '', inScope: false, unresolved: false });
+  });
+  it('keeps the scope when the root namespace is known', () => {
+    expect(projectScope(true, 'R')).toEqual({ rootNamespace: 'R', inScope: true, unresolved: false });
+    expect(projectScope(false, 'R')).toEqual({ rootNamespace: 'R', inScope: false, unresolved: false });
   });
 });
 

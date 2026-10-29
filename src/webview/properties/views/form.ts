@@ -119,8 +119,9 @@ export function renderProperties(
     const controlWrap = el('div', 'props-control');
     row.append(label, controlWrap, badges, msg);
     sections.get(def.section)!.append(row);
-    // A text input cannot hold CR/LF, so a multi-line value in the .csproj is read-only here.
-    const multiline = state.origin === 'project' && /[\r\n]/.test(state.raw ?? '');
+    // A text input cannot hold CR/LF, so a multi-line value (in the .csproj, or inherited) is read-only here.
+    const multiline = (state.origin === 'project' && /[\r\n]/.test(state.raw ?? ''))
+      || (state.origin === 'inherited' && /[\r\n]/.test(state.evaluated));
     const locked = ro || state.origin === 'conditional' || multiline;
     const base = state.origin === 'project' ? (state.raw ?? state.evaluated) : state.evaluated;
     const edited = (): void => { entry.reset = false; entry.touched = true; sync(); };

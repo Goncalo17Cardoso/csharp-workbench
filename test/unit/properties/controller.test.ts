@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { PropertiesController, labelKeys } from '../../../src/properties/controller';
+import { PropertiesController, invalidEdit, labelKeys } from '../../../src/properties/controller';
 import type { PropsToWebview } from '../../../src/properties/protocol';
 
 const P = '/p/a.csproj';
@@ -13,7 +13,8 @@ function mk(opts: { evalFails?: boolean; diskChangesBeforeWrite?: boolean; launc
       s.evals++;
       if (opts.evalFails) throw new Error('boom');
       const m = /<(Version)>([^<]*)</.exec(s.tmp || s.text);
-      return Object.fromEntries(names.map((n) => [n, n === 'Version' && m ? m[2] : n === 'TargetFramework' ? 'net8.0' : '']));
+      const tfs = /<TargetFrameworks>([^<]*)</.exec(s.tmp || s.text)?.[1] ?? ''; // echoed unevaluated
+      return Object.fromEntries(names.map((n) => [n, n === 'Version' && m ? m[2] : n === 'TargetFramework' ? 'net8.0' : n === 'TargetFrameworks' ? tfs : '']));
     },
     writer: {
       readFile: async () => (opts.diskChangesBeforeWrite ? s.text + '<!-- other -->' : s.text),
@@ -88,6 +89,28 @@ describe('PropertiesController', () => {
     const errs = s.posts.map((p) => (p.type === 'error' ? p.message : p.type));
     expect(errs[0]).toContain('T:Default namespace');
     expect(errs[1]).toContain('T:Target framework(s)');
+  });
+
+  it('a TFM edit validates only the frameworks the user added', async () => {
+    const { s, c } = mk();
+    s.text = CSPROJ.replace('<TargetFramework>net8.0</TargetFramework>', '<TargetFrameworks>$(ExtraTfms);Net8.0</TargetFrameworks>');
+    await c.handle({ type: 'ready' });
+    s.posts.length = 0;
+    await c.handle({ type: 'save', edits: [{ kind: 'targetFrameworks', tfms: ['$(ExtraTfms)', 'Net8.0', 'bogus'] }] });
+    expect(s.writes).toBe(0);
+    expect(s.posts.map((p) => (p.type === 'error' ? p.message : p.type))[0]).toContain('T:Target framework(s)');
+    s.posts.length = 0;
+    await c.handle({ type: 'save', edits: [{ kind: 'targetFrameworks', tfms: ['$(ExtraTfms)', 'Net8.0', 'net9.0'] }] });
+    expect(s.posts.filter((p) => p.type === 'error')).toEqual([]);
+    expect(s.text).toContain('<TargetFrameworks>$(ExtraTfms);Net8.0;net9.0</TargetFrameworks>');
+  });
+
+  it('invalidEdit skips TFMs already in the original list', () => {
+    const e = (tfms: string[]) => [{ kind: 'targetFrameworks' as const, tfms }];
+    expect(invalidEdit(e(['$(X)', 'Net8.0']), ['$(X)', 'Net8.0', 'net9.0'])).toBeUndefined();
+    expect(invalidEdit(e(['$(X)', 'uap10.0']), ['$(X)'])).toBeDefined();
+    expect(invalidEdit(e(['$(X)']))).toBeDefined();
+    expect(invalidEdit(e([]), ['net8.0'])).toBeDefined();
   });
 
   it('save posts saved and a reloaded model', async () => {

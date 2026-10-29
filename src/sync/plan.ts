@@ -10,6 +10,13 @@
 // gets `using Old;` when Old still exists. A qualified `Old.T` is rewritten only when T moved to
 // exactly one target and no file declares T in Old after the sync; otherwise it is reported in
 // `ambiguous` (`targets` lists the moved targets plus Old when T also stays there).
+//
+// Partial types are never split: an in-scope file does not move when a file that keeps its
+// namespace (generated, out-of-scope, skipped, `#if` or already in sync) declares one of its
+// types in the same old namespace, or when another file declaring one of its types there is
+// headed to a different namespace. This holds transitively; such files are reported as
+// 'partialSplit' and are treated as unmoved. Two top-level declarations of one name in one
+// namespace only compile when partial, so no `partial` detection is needed.
 
 import { dirname } from 'node:path';
 import { namespaceFor } from '../solution/naming';
@@ -19,7 +26,7 @@ export interface SyncInputFile { path: string; text: string; projectDir: string;
 export interface TextEdit { start: number; end: number; newText: string; kind: 'declaration' | 'using' | 'qualified' }
 export interface SyncPlan {
   edits: Map<string, TextEdit[]>;
-  skipped: { path: string; reason: 'noNamespace' | 'multipleNamespaces' | 'nested' | 'preprocessor' }[];
+  skipped: { path: string; reason: 'noNamespace' | 'multipleNamespaces' | 'nested' | 'preprocessor' | 'partialSplit' }[];
   moves: { from: string; to: string; types: string[] }[];
   ambiguous: { from: string; type: string; targets: string[] }[];
 }
@@ -71,32 +78,60 @@ export function planSync(files: SyncInputFile[]): SyncPlan {
   const targetsOf = new Map<string, string[]>(); // old ns -> distinct new namespaces
   const typeMoves = new Map<string, Map<string, Set<string>>>(); // old ns -> type -> new namespaces
 
+  // Files that would get a declaration edit, before partial types are checked.
+  const wanted = new Map<string, string>(); // path -> expected namespace
+  const skipReason = new Map<string, SyncPlan['skipped'][number]['reason']>();
   for (const f of files) {
     const info = infos.get(f.path)!;
-    let moved: string | undefined;
     if (info.hasConditional || info.hasPreprocessorAroundNamespace) {
-      if (f.inScope) plan.skipped.push({ path: f.path, reason: 'preprocessor' });
+      if (f.inScope) skipReason.set(f.path, 'preprocessor');
     } else if (f.inScope) {
       const reason = info.namespaces.length === 0 ? 'noNamespace'
         : info.namespaces.some((n) => n.depth > 0) ? 'nested'
         : info.namespaces.length > 1 ? 'multipleNamespaces' : undefined;
-      if (reason) plan.skipped.push({ path: f.path, reason });
+      if (reason) skipReason.set(f.path, reason);
       else {
-        const ns = info.namespaces[0];
         const expected = namespaceFor(f.rootNamespace, f.projectDir, dirname(f.path));
-        if (ns.name !== expected) {
-          add(f.path, { start: ns.nameStart, end: ns.nameEnd, newText: expected, kind: 'declaration' });
-          plan.moves.push({ from: ns.name, to: expected, types: [...info.typeNames] });
-          moved = expected;
-          oldNsOf.set(f.path, ns.name);
-          const t = targetsOf.get(ns.name) ?? [];
-          if (!t.includes(expected)) t.push(expected);
-          targetsOf.set(ns.name, t);
-          const tm = typeMoves.get(ns.name) ?? new Map<string, Set<string>>();
-          for (const type of info.typeNames) tm.set(type, (tm.get(type) ?? new Set<string>()).add(expected));
-          typeMoves.set(ns.name, tm);
-        }
+        if (info.namespaces[0].name !== expected) wanted.set(f.path, expected);
       }
+    }
+  }
+  // Keep partial types together (to a fixed point): a type key is `namespace\0type`.
+  const keysOf = (path: string) => fulls.get(path)!.flatMap((ns) => infos.get(path)!.typeNames.map((t) => `${ns}\0${t}`));
+  const staying = new Set<string>();
+  for (const f of files) if (!wanted.has(f.path)) keysOf(f.path).forEach((k) => staying.add(k));
+  for (let changed = true; changed;) {
+    changed = false;
+    const targetsByKey = new Map<string, Set<string>>();
+    for (const [path, to] of wanted) for (const k of keysOf(path)) targetsByKey.set(k, (targetsByKey.get(k) ?? new Set<string>()).add(to));
+    for (const path of [...wanted.keys()]) {
+      const keys = keysOf(path);
+      if (!keys.some((k) => staying.has(k) || targetsByKey.get(k)!.size > 1)) continue;
+      wanted.delete(path);
+      skipReason.set(path, 'partialSplit');
+      keys.forEach((k) => staying.add(k));
+      changed = true;
+    }
+  }
+
+  for (const f of files) {
+    const info = infos.get(f.path)!;
+    let moved: string | undefined;
+    const reason = skipReason.get(f.path);
+    const expected = wanted.get(f.path);
+    if (reason) plan.skipped.push({ path: f.path, reason });
+    else if (expected !== undefined) {
+      const ns = info.namespaces[0];
+      add(f.path, { start: ns.nameStart, end: ns.nameEnd, newText: expected, kind: 'declaration' });
+      plan.moves.push({ from: ns.name, to: expected, types: [...info.typeNames] });
+      moved = expected;
+      oldNsOf.set(f.path, ns.name);
+      const t = targetsOf.get(ns.name) ?? [];
+      if (!t.includes(expected)) t.push(expected);
+      targetsOf.set(ns.name, t);
+      const tm = typeMoves.get(ns.name) ?? new Map<string, Set<string>>();
+      for (const type of info.typeNames) tm.set(type, (tm.get(type) ?? new Set<string>()).add(expected));
+      typeMoves.set(ns.name, tm);
     }
     const names = moved !== undefined ? [moved] : fulls.get(f.path)!;
     if (moved !== undefined) newNsOf.set(f.path, moved);

@@ -4,7 +4,7 @@
 
 - Project Properties page (Application, Build, Package, Assembly, Debug): evaluated values, inherited vs. set in the `.csproj`, Reset, multi-target frameworks, read-only conditional properties.
 - Launch Profiles: create, duplicate, rename, delete and edit `launchSettings.json` profiles (comments preserved); the active profile drives Run (`--launch-profile`) and Debug.
-- Sync Namespaces with a refactor preview of declarations, `using` directives and qualified names, from the evaluated root namespace; files with `#if`, multiple or nested namespaces and ambiguous types are skipped and listed; generated files keep their namespace declarations (listed as skipped) but still count as declared and get their references updated; `bin/` and `obj/` are excluded.
+- Sync Namespaces with a refactor preview of declarations, `using` directives and qualified names, from the evaluated root namespace; files with `#if`, multiple or nested namespaces and ambiguous types are skipped and listed; generated files keep their namespace declarations (listed as skipped) but still count as declared and get their references updated; partial types are never split across namespaces; a project whose root namespace cannot be evaluated only gets reference updates; `bin/` and `obj/` are excluded.
 - The `.csproj` property editor is the second hand edit of project files: unconditional PropertyGroups only, byte-preserving, atomic with a `.cw-bak` backup, validated with `dotnet msbuild`.
 - Fix: the extension bundle now uses the ESM build of `jsonc-parser`.
 

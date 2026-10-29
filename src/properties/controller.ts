@@ -47,13 +47,18 @@ export function labelKeys(): string[] {
 
 const msg = (e: unknown): string => (e instanceof Error ? e.message : String(e));
 
-/** The first edit the schema validators reject, as [field label, message] l10n keys; undefined when all pass. */
-export function invalidEdit(edits: PropertyEdit[]): [label: string, message: string] | undefined {
+/**
+ * The first edit the schema validators reject, as [field label, message] l10n keys; undefined when all pass.
+ * A TFM list is checked only for frameworks not in `originalTfms`: entries already in the file
+ * (`$(X)`, `Net8.0`) are kept verbatim.
+ */
+export function invalidEdit(edits: PropertyEdit[], originalTfms: string[] = []): [label: string, message: string] | undefined {
   for (const e of edits) {
     if (e.kind === 'remove') continue;
     if (e.kind === 'targetFrameworks') {
       const label = FIELDS.find((f) => f.kind === 'tfms')!.label;
-      const bad = e.tfms.length === 0 ? validateTfm('') : e.tfms.map(validateTfm).find((m) => m !== undefined);
+      const added = e.tfms.filter((t) => !originalTfms.includes(t));
+      const bad = e.tfms.length === 0 ? validateTfm('') : added.map(validateTfm).find((m) => m !== undefined);
       if (bad) return [label, bad];
       continue;
     }
@@ -62,6 +67,15 @@ export function invalidEdit(edits: PropertyEdit[]): [label: string, message: str
     if (def && bad) return [def.label, bad];
   }
   return undefined;
+}
+
+/** The TFM list the page started from: the .csproj text for a project value, else the evaluated value. */
+function originalTfms(model: PropertiesModel): string[] {
+  const def = FIELDS.find((f) => f.kind === 'tfms')!;
+  const state = model.fields.find((f) => f.property === def.property);
+  if (!state) return [];
+  const base = state.origin === 'project' ? (state.raw ?? state.evaluated) : state.evaluated;
+  return base.split(';').map((x) => x.trim()).filter((x) => x !== '');
 }
 
 export class PropertiesController {
@@ -212,7 +226,7 @@ export class PropertiesController {
       this.deps.post({ type: 'error', message: this.deps.t('The project could not be evaluated, so it is read-only.') });
       return false;
     }
-    const invalid = invalidEdit(edits);
+    const invalid = invalidEdit(edits, originalTfms(this.model));
     if (invalid) {
       const { t } = this.deps;
       this.deps.post({ type: 'error', message: t('{0}: {1}', t(invalid[0]), t(invalid[1])) });

@@ -29,10 +29,20 @@ export function syncFileInput(role: 'source' | 'generated', file: SyncInputFile)
   return { file: { ...file, inScope: false }, generated: file.inScope };
 }
 
-/** The evaluated RootNamespace, or the project file name when it is empty or could not be evaluated. */
-export function resolveRootNamespace(projectPath: string, evaluated: string | undefined): string {
+/** The evaluated RootNamespace; undefined when it is empty or could not be evaluated (no file-name guess). */
+export function resolveRootNamespace(evaluated: string | undefined): string | undefined {
   const v = evaluated?.trim();
-  return v ? v : path.basename(projectPath).replace(/\.csproj$/i, '');
+  return v ? v : undefined;
+}
+
+/**
+ * How a project's files enter the planner. Without a root namespace its files are out of scope
+ * (they count as declared and get reference edits, never a declaration edit); `unresolved` is
+ * true when that took a picked project out of scope and should be reported.
+ */
+export function projectScope(inScope: boolean, rootNamespace: string | undefined): { rootNamespace: string; inScope: boolean; unresolved: boolean } {
+  if (rootNamespace === undefined) return { rootNamespace: '', inScope: false, unresolved: inScope };
+  return { rootNamespace, inScope, unresolved: false };
 }
 
 /** True when the first 5 lines carry an auto-generated marker. */
