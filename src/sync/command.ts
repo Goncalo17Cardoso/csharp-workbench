@@ -11,7 +11,7 @@ import { loadSolution } from '../solution/slnParse';
 import type { SolutionTreeProvider } from '../solution/SolutionTreeProvider';
 import { chooseText, hasGeneratedHeader, isSyncCandidate } from './candidates';
 import { toWorkspaceEditSpec } from './editSpec';
-import { planSync, type SyncInputFile } from './plan';
+import { planSync, type SyncInputFile, type SyncPlan } from './plan';
 
 export { toWorkspaceEditSpec } from './editSpec';
 
@@ -21,6 +21,8 @@ interface Deps {
   getCli(): Promise<DotnetCli | undefined>;
   /** Test mode only: apply without the refactor preview. Always false in production. */
   skipConfirmation(): boolean;
+  /** Test mode only: receives a function that computes the plan without applying it. */
+  expose?(plan: (nodeOrPath?: TreeNode | string) => Promise<{ plan: SyncPlan; texts: Map<string, string> } | undefined>): void;
 }
 
 const errText = (e: unknown) => (e instanceof Error ? e.message : String(e));
@@ -34,7 +36,14 @@ export function registerSyncCommands(deps: Deps): vscode.Disposable[] {
   const core = deps.provider.treeCore;
 
   async function collect(scopeProject: string | undefined, solution: string | undefined, cli: DotnetCli, token: vscode.CancellationToken): Promise<{ files: SyncInputFile[]; dirtyTexts: Set<string> } | undefined> {
-    const projects = solution ? (await loadSolution(solution, readText)).projects.map((p) => p.path) : [];
+    let projects: string[] = [];
+    if (solution) {
+      try { projects = (await loadSolution(solution, readText)).projects.map((p) => p.path); } catch (e) {
+        // A solution that vanished or cannot be read must not block syncing the project the user picked.
+        if (!scopeProject) throw e;
+        deps.output.info(`${solution}: ${errText(e)}`);
+      }
+    }
     if (scopeProject && !projects.some((p) => path.resolve(p) === path.resolve(scopeProject))) projects.push(scopeProject);
     const open = new Map(vscode.workspace.textDocuments.filter((d) => d.isDirty && d.uri.scheme === 'file').map((d) => [path.resolve(d.uri.fsPath), d]));
     const files: SyncInputFile[] = [];
@@ -62,6 +71,14 @@ export function registerSyncCommands(deps: Deps): vscode.Disposable[] {
     }
     return { files, dirtyTexts: new Set(open.keys()) };
   }
+
+  deps.expose?.(async (nodeOrPath) => {
+    const scope = typeof nodeOrPath === 'string' ? nodeOrPath : nodeOrPath?.kind === 'project' ? nodeOrPath.path : undefined;
+    const cli = await deps.getCli();
+    if (!cli) return undefined;
+    const input = await collect(scope, core.solutionPath, cli, new vscode.CancellationTokenSource().token);
+    return input && { plan: planSync(input.files), texts: new Map(input.files.map((f) => [f.path, f.text])) };
+  });
 
   async function sync(node?: TreeNode): Promise<void> {
     const solution = core.solutionPath;

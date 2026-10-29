@@ -8,6 +8,8 @@ const options = {
   format: 'cjs',
   target: 'node20',
   external: ['vscode'],
+  // jsonc-parser's UMD entry ("main") uses dynamic requires that fail once bundled; use its ESM build.
+  mainFields: ['module', 'main'],
   sourcemap: true,
 };
 
@@ -38,6 +40,7 @@ if (process.argv.includes('--tests')) {
     format: 'cjs',
     target: 'node20',
     external: ['vscode', 'mocha'],
+    mainFields: ['module', 'main'],
     sourcemap: true,
   });
 } else if (process.argv.includes('--watch')) {

@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.3.0
+
+- Project Properties page (Application, Build, Package, Assembly, Debug): evaluated values, inherited vs. set in the `.csproj`, Reset, multi-target frameworks, read-only conditional properties.
+- Launch Profiles: create, duplicate, rename, delete and edit `launchSettings.json` profiles (comments preserved); the active profile drives Run (`--launch-profile`) and Debug.
+- Sync Namespaces with a refactor preview of declarations, `using` directives and qualified names; files with `#if`, generated code, multiple or nested namespaces and ambiguous types are skipped and listed.
+- The `.csproj` property editor is the second hand edit of project files: unconditional PropertyGroups only, byte-preserving, atomic with a `.cw-bak` backup, validated with `dotnet msbuild`.
+- Fix: the extension bundle now uses the ESM build of `jsonc-parser`.
+
 ## 0.2.0
 
 - Solution Explorer view: solution folders, projects, folders and files with Visual Studio-style file nesting, Dependencies (Packages, Projects, Frameworks) and a Show All Files toggle.

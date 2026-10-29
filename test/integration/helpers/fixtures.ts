@@ -87,3 +87,57 @@ export async function createSolutionExplorerFixture(
   await dotnet(dn, ['restore', sln], dir);
   return { sln, api, core, tests, templates: { api: apiTemplate, tests: testsTemplate } };
 }
+
+export interface PropertiesFixture {
+  dir: string;
+  /** `<dir>/My App #1/MyApi.csproj`: BOM, CRLF, a comment, an unconditional and a conditional PropertyGroup. */
+  csproj: string;
+  /** Exact bytes of the csproj as created. */
+  csprojBytes: Buffer;
+  propsFile: string;
+  launchSettings: string;
+}
+
+/**
+ * ASP.NET Core (`webapi`) project MyApi in `<dir>/My App #1/` whose Nullable comes from a
+ * Directory.Build.props, with Models/Customer.cs, a file using it, and a two-namespace file.
+ * No fallback template: the fixture fails when `webapi` is missing.
+ */
+export async function createPropertiesFixture(dir: string, opts: { dotnetPath?: string } = {}): Promise<PropertiesFixture> {
+  const dn = opts.dotnetPath ?? 'dotnet';
+  const projDir = path.join(dir, 'My App #1');
+  await fs.mkdir(dir, { recursive: true });
+  await dotnet(dn, ['new', 'webapi', '-n', 'MyApi', '-o', projDir, '-f', 'net8.0'], dir);
+  const propsFile = path.join(dir, 'Directory.Build.props');
+  await fs.writeFile(propsFile, '<Project>\n  <PropertyGroup>\n    <Nullable>enable</Nullable>\n  </PropertyGroup>\n</Project>\n');
+  const csproj = path.join(projDir, 'MyApi.csproj');
+  const template = await fs.readFile(csproj, 'utf8');
+  const itemGroup = template.match(/\s*<ItemGroup>[\s\S]*?<\/ItemGroup>/)?.[0].replace(/\r?\n/g, '\r\n') ?? '';
+  const text = [
+    '<Project Sdk="Microsoft.NET.Sdk.Web">',
+    '  <!-- keep me -->',
+    '  <PropertyGroup>',
+    '    <TargetFramework>net8.0</TargetFramework>',
+    '    <ImplicitUsings>enable</ImplicitUsings>',
+    '  </PropertyGroup>',
+    '  <PropertyGroup Condition="\'$(Configuration)\'==\'Debug\'">',
+    '    <DefineConstants>$(DefineConstants);CWDEBUG</DefineConstants>',
+    '  </PropertyGroup>',
+    '</Project>',
+    '',
+  ].join('\r\n').replace('\r\n</Project>', `${itemGroup}\r\n</Project>`);
+  const csprojBytes = Buffer.concat([Buffer.from([0xef, 0xbb, 0xbf]), Buffer.from(text, 'utf8')]);
+  await fs.writeFile(csproj, csprojBytes);
+  await fs.mkdir(path.join(projDir, 'Models'), { recursive: true });
+  await fs.mkdir(path.join(projDir, 'Services'), { recursive: true });
+  await fs.writeFile(path.join(projDir, 'Models', 'Customer.cs'), 'namespace MyApi.Models;\n\npublic class Customer { }\n');
+  await fs.writeFile(path.join(projDir, 'Services', 'CustomerService.cs'),
+    'using MyApi.Models;\n\nnamespace MyApi.Services;\n\npublic class CustomerService\n{\n    public Customer? Find() => null;\n}\n');
+  await fs.writeFile(path.join(projDir, 'Services', 'Multi.cs'), 'namespace One { public class A { } }\nnamespace Two { public class B { } }\n');
+  const launchSettings = path.join(projDir, 'Properties', 'launchSettings.json');
+  await fs.mkdir(path.dirname(launchSettings), { recursive: true });
+  await fs.writeFile(launchSettings,
+    '{\n  // keep this comment\n  "profiles": {\n    "http": {\n      "commandName": "Project",\n      "applicationUrl": "http://localhost:5099"\n    }\n  }\n}\n');
+  await dotnet(dn, ['restore', csproj], dir);
+  return { dir, csproj, csprojBytes, propsFile, launchSettings };
+}

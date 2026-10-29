@@ -2,7 +2,7 @@
   "name": "csharp-workbench",
   "displayName": "C# Workbench",
   "description": "A Visual Studio-style NuGet package manager for .NET solutions and projects in VS Code.",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "publisher": "TODO-publisher",
   "engines": {
     "vscode": "^1.95.0"

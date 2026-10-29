@@ -38,7 +38,38 @@ Everything goes through the `dotnet` CLI (`dotnet new`, `dotnet sln add/remove`,
 
 ### The solution-folder exception
 
-Everything above uses the CLI and never edits `.sln`, `.slnx` or `.csproj` text by hand, with one exception: solution folders. `dotnet sln` cannot create, rename or remove an empty solution folder, so for those three actions the extension edits the solution file directly. The edit is written only for folders, keeps every other byte of the file (BOM, line endings, GUIDs, unknown sections), and is validated with `dotnet sln list`. A backup of the original is kept until the result is validated; if validation fails, the original is restored and the error is shown.
+Everything above uses the CLI and never edits `.sln`, `.slnx` or `.csproj` text by hand, with two exceptions: solution folders (this section) and the Properties editor (see below). For solution folders: `dotnet sln` cannot create, rename or remove an empty solution folder, so for those three actions the extension edits the solution file directly. The edit is written only for folders, keeps every other byte of the file (BOM, line endings, GUIDs, unknown sections), and is validated with `dotnet sln list`. A backup of the original is kept until the result is validated; if validation fails, the original is restored and the error is shown.
+
+## Project Properties
+
+Right-click a project in the Solution Explorer and choose **Properties** (or run **C# Workbench: Project Properties** from the Command Palette) for a Visual Studio-style page with Application, Build, Package, Assembly and Debug sections. Values are the ones MSBuild evaluates (`dotnet msbuild -getProperty`), so properties that come from `Directory.Build.props` show as **inherited**; editing one creates an override in the `.csproj`, and **Reset** removes it again.
+
+- Choosing more than one Target framework swaps `TargetFramework` for `TargetFrameworks` in a single write.
+- Properties defined with a `Condition` (or per configuration) are shown read-only, with an **Open in .csproj** link.
+- Duplicated properties are flagged; the last occurrence is the one edited.
+- If the project cannot be evaluated, the page opens read-only with the error.
+
+### The `.csproj` property editor exception
+
+The `dotnet` CLI cannot change MSBuild properties, so this is the second place (after solution folders) where the extension edits a project file by hand. It lives in one dedicated module with these safety rules:
+
+- It only touches property elements inside **unconditional** `PropertyGroup`s of the project's own `.csproj`: it changes an existing element's text, adds one to the first unconditional group (same indentation), or removes one (Reset).
+- Everything else is preserved byte for byte: formatting, comments, BOM, line endings, attributes and order. `&`, `<` and `>` in values are escaped.
+- The write is atomic, keeps a `.cw-bak` backup until validation passes, follows symlinks, and refuses read-only files and files that changed on disk.
+- After writing, `dotnet msbuild -getProperty` (with restore) must evaluate each edited property to the requested value (or, for Reset, no longer take it from the `.csproj`). If it does not, the original is restored and the error is shown.
+
+## Launch Profiles
+
+The Debug section of the Properties page edits `Properties/launchSettings.json`: create, duplicate, rename and delete profiles, and edit command line arguments, working directory, application URL, launch browser and URL, executable path and environment variables. The file is edited with minimal changes (`jsonc-parser`), so comments and formatting are kept, and written atomically. It is created when you add the first profile.
+
+- **Set as active** chooses the profile used by Run and Debug. Run passes `--launch-profile <name>`; Debug starts with the profile's environment variables, arguments, working directory and URL, and opens the browser at the application URL when the profile asks for it. Executable profiles run the configured executable.
+- `%VAR%` and `$VAR` in environment variables are expanded for Debug as `dotnet run` does.
+
+## Sync Namespaces
+
+After moving files between folders, run **Sync Namespaces** from a project or the solution. It computes the namespace each file should have (from the project's root namespace and the folder, Visual Studio rules) and shows the changes in VS Code's refactor preview: namespace declarations, `using` directives and qualified names that refer to moved types. Undo and open files with unsaved changes are handled by VS Code, and only source files change.
+
+Sync skips, and lists in the "C# Workbench" Output channel, files that contain `#if`, are generated, declare multiple or nested namespaces, or whose type references are ambiguous.
 
 ## Usage
 
@@ -59,7 +90,10 @@ Right-click a `.sln`, `.slnx` or `.csproj` file in the Explorer and choose **Man
 - No `packages.config` projects (non-SDK-style .NET Framework).
 - Encrypted passwords in `nuget.config` are not supported (clear-text only).
 - No new `VersionOverride` entries are created under Central Package Management.
-- No Project Properties UI, launch profiles (`launchSettings.json`), Sync Namespaces or `.resx` editor yet.
+- Properties set per configuration (under a `Condition`) are read-only; edit them in the `.csproj`.
+- Sync Namespaces skips files with `#if`, generated files, files with multiple or nested namespaces, and ambiguous types, and lists them in the Output channel.
+- Launch profiles for IIS, IIS Express and Docker are shown but not supported.
+- No `.resx` editor yet.
 
 ## Development
 

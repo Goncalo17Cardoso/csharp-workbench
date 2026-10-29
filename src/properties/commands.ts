@@ -10,6 +10,7 @@ import { loadSolution } from '../solution/slnParse';
 import type { SolutionTreeProvider } from '../solution/SolutionTreeProvider';
 import { PropertiesController } from './controller';
 import { scanCsproj } from './csprojScan';
+import type { PropsToWebview } from './protocol';
 import { PropertiesPanel } from './PropertiesPanel';
 
 interface Deps {
@@ -17,6 +18,10 @@ interface Deps {
   extensionUri: vscode.Uri;
   provider: SolutionTreeProvider;
   getCli(): Promise<DotnetCli | undefined>;
+  /** Test mode only: observes every message posted to a panel. */
+  onPost?(m: PropsToWebview): void;
+  /** Test mode only: receives the open/controllerFor hooks. */
+  expose?(hooks: { open(projectPath: string): Promise<void>; controllerFor(projectPath: string): PropertiesController | undefined }): void;
 }
 
 interface Open { panel?: PropertiesPanel; controller?: PropertiesController }
@@ -79,7 +84,7 @@ export function registerPropertiesCommands(deps: Deps): vscode.Disposable[] {
           void vscode.commands.executeCommand('csharpWorkbench.refresh');
         },
       },
-      post: (m) => panel.post(m),
+      post: (m) => { deps.onPost?.(m); panel.post(m); },
       onSecrets: () => void vscode.commands.executeCommand('csharpWorkbench.manageUserSecrets', { kind: 'project', path: project }),
       openAt: (property) => void openAt(project, property),
       t: (message, ...args) => vscode.l10n.t(message, ...args),
@@ -113,6 +118,11 @@ export function registerPropertiesCommands(deps: Deps): vscode.Disposable[] {
     watcher.onDidDelete(changed);
     open.set(project, { panel, controller });
   }
+
+  deps.expose?.({
+    open: (p) => openProperties({ kind: 'project', path: p } as TreeNode),
+    controllerFor: (p) => open.get(p)?.controller,
+  });
 
   return [
     vscode.commands.registerCommand('csharpWorkbench.projectProperties', (n?: TreeNode) => openProperties(n)),
