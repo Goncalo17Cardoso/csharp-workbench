@@ -5,7 +5,7 @@ export interface EditSpec {
   path: string;
   range: { startLine: number; startCol: number; endLine: number; endCol: number };
   newText: string;
-  label: string;
+  kind: 'declaration' | 'using' | 'qualified';
 }
 
 /** Line starts of `text` (breaks: CRLF, LF, lone CR), as offsets. */
@@ -29,14 +29,6 @@ function positionAt(text: string, starts: number[], offset: number): { line: num
   return { line: lo, col: Math.max(0, offset - starts[lo] - bom) };
 }
 
-function labelOf(text: string, start: number, end: number, newText: string): string {
-  const lineStart = Math.max(text.lastIndexOf('\n', start - 1), text.lastIndexOf('\r', start - 1)) + 1;
-  const before = text.slice(lineStart, start);
-  if (/\bnamespace\s+[\w.]*$/.test(before)) return 'Namespace declaration';
-  if (/^\s*(global\s+)?using\b/.test(before) || /\busing\s/.test(newText) || /\busing\b/.test(text.slice(start, end))) return 'Using directive';
-  return 'Qualified name';
-}
-
 export function toWorkspaceEditSpec(plan: SyncPlan, texts: Map<string, string>): EditSpec[] {
   const out: EditSpec[] = [];
   for (const [path, edits] of plan.edits) {
@@ -47,7 +39,7 @@ export function toWorkspaceEditSpec(plan: SyncPlan, texts: Map<string, string>):
       const s = positionAt(text, starts, e.start);
       const t = positionAt(text, starts, e.end);
       out.push({
-        path, newText: e.newText, label: labelOf(text, e.start, e.end, e.newText),
+        path, newText: e.newText, kind: e.kind,
         range: { startLine: s.line, startCol: s.col, endLine: t.line, endCol: t.col },
       });
     }

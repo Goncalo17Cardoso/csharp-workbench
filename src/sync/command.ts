@@ -9,6 +9,7 @@ import { readProjectInfo } from '../solution/projectInfo';
 import { loadProjectItems } from '../solution/projectItems';
 import { loadSolution } from '../solution/slnParse';
 import type { SolutionTreeProvider } from '../solution/SolutionTreeProvider';
+import { chooseText, hasGeneratedHeader, isSyncCandidate } from './candidates';
 import { toWorkspaceEditSpec } from './editSpec';
 import { planSync, type SyncInputFile } from './plan';
 
@@ -25,29 +26,17 @@ interface Deps {
 const errText = (e: unknown) => (e instanceof Error ? e.message : String(e));
 const readText = (p: string) => fsp.readFile(p, 'utf8');
 
-/** A compile item that belongs to the project: not linked, inside its directory, not under bin/ or obj/. */
-export function isSyncCandidate(projectDir: string, item: { fullPath: string; link?: string }): boolean {
-  if (item.link || !item.fullPath.toLowerCase().endsWith('.cs')) return false;
-  const rel = path.relative(projectDir, item.fullPath);
-  if (!rel || rel.startsWith('..') || path.isAbsolute(rel)) return false;
-  return !rel.split(/[\\/]/).slice(0, -1).some((s) => s === 'bin' || s === 'obj');
-}
-
-const labelText = (label: string) => {
-  switch (label) {
-    case 'Namespace declaration': return vscode.l10n.t('Namespace declaration');
-    case 'Using directive': return vscode.l10n.t('Using directive');
-    default: return vscode.l10n.t('Qualified name');
-  }
-};
+const labelText = (kind: 'declaration' | 'using' | 'qualified') =>
+  kind === 'declaration' ? vscode.l10n.t('Namespace declaration')
+    : kind === 'using' ? vscode.l10n.t('Using directive') : vscode.l10n.t('Qualified name');
 
 export function registerSyncCommands(deps: Deps): vscode.Disposable[] {
   const core = deps.provider.treeCore;
 
   async function collect(scopeProject: string | undefined, solution: string | undefined, cli: DotnetCli, token: vscode.CancellationToken): Promise<{ files: SyncInputFile[]; dirtyTexts: Set<string> } | undefined> {
     const projects = solution ? (await loadSolution(solution, readText)).projects.map((p) => p.path) : [];
-    if (scopeProject && !projects.includes(scopeProject)) projects.push(scopeProject);
-    const open = new Map(vscode.workspace.textDocuments.filter((d) => d.isDirty && d.uri.scheme === 'file').map((d) => [d.uri.fsPath, d]));
+    if (scopeProject && !projects.some((p) => path.resolve(p) === path.resolve(scopeProject))) projects.push(scopeProject);
+    const open = new Map(vscode.workspace.textDocuments.filter((d) => d.isDirty && d.uri.scheme === 'file').map((d) => [path.resolve(d.uri.fsPath), d]));
     const files: SyncInputFile[] = [];
     const seen = new Set<string>();
     for (const project of projects) {
@@ -59,14 +48,14 @@ export function registerSyncCommands(deps: Deps): vscode.Disposable[] {
         continue;
       }
       const items = await loadProjectItems(project, cli, { readdir: (d) => fsp.readdir(d, { withFileTypes: true }) });
-      const inScope = !scopeProject || project === scopeProject;
+      const inScope = !scopeProject || path.resolve(project) === path.resolve(scopeProject);
       for (const item of items.items.filter((i) => isSyncCandidate(projectDir, i))) {
         if (token.isCancellationRequested) return undefined;
         if (seen.has(item.fullPath)) continue;
         seen.add(item.fullPath);
         try {
-          const doc = open.get(item.fullPath);
-          const text = doc ? doc.getText() : await nodeTextFs.readFile(item.fullPath);
+          const text = await chooseText(open.get(path.resolve(item.fullPath))?.getText(), () => nodeTextFs.readFile(item.fullPath));
+          if (hasGeneratedHeader(text)) continue;
           files.push({ path: item.fullPath, text, projectDir, rootNamespace, inScope });
         } catch (e) { deps.output.info(`${item.fullPath}: ${errText(e)}`); }
       }
@@ -91,8 +80,15 @@ export function registerSyncCommands(deps: Deps): vscode.Disposable[] {
       );
       if (!planned) return;
       const { plan, texts } = planned;
+      for (const s of plan.skipped) deps.output.info(`Sync Namespaces: skipped ${s.path} (${s.reason})`);
+      for (const a of plan.ambiguous) deps.output.info(`Sync Namespaces: ambiguous ${a.from}.${a.type} -> ${a.targets.join(', ')}`);
       const specs = toWorkspaceEditSpec(plan, texts);
-      if (!specs.length) { void vscode.window.showInformationMessage(vscode.l10n.t('Namespaces are already in sync.')); return; }
+      if (!specs.length) {
+        void vscode.window.showInformationMessage(plan.skipped.length || plan.ambiguous.length
+          ? vscode.l10n.t('No changes were made; some files were skipped or are ambiguous. See the Output channel.')
+          : vscode.l10n.t('Namespaces are already in sync.'));
+        return;
+      }
 
       const skip = deps.skipConfirmation();
       const edit = new vscode.WorkspaceEdit();
@@ -101,13 +97,11 @@ export function registerSyncCommands(deps: Deps): vscode.Disposable[] {
           vscode.Uri.file(s.path),
           new vscode.Range(s.range.startLine, s.range.startCol, s.range.endLine, s.range.endCol),
           s.newText,
-          { needsConfirmation: !skip, label: labelText(s.label) },
+          { needsConfirmation: !skip, label: labelText(s.kind) },
         );
       }
       if (!(await vscode.workspace.applyEdit(edit, { isRefactoring: true }))) return;
 
-      for (const s of plan.skipped) deps.output.info(`Sync Namespaces: skipped ${s.path} (${s.reason})`);
-      for (const a of plan.ambiguous) deps.output.info(`Sync Namespaces: ambiguous ${a.from}.${a.type} -> ${a.targets.join(', ')}`);
       const build = vscode.l10n.t('Build');
       void Promise.resolve(vscode.window.showInformationMessage(vscode.l10n.t('Namespaces synchronized.'), build)).then((c) => {
         if (c !== build) return;

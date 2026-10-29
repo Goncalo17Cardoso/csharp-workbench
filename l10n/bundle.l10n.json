@@ -186,5 +186,6 @@
   "Namespace declaration": "Namespace declaration",
   "Using directive": "Using directive",
   "Qualified name": "Qualified name",
-  "Namespaces synchronized.": "Namespaces synchronized."
+  "Namespaces synchronized.": "Namespaces synchronized.",
+  "No changes were made; some files were skipped or are ambiguous. See the Output channel.": "No changes were made; some files were skipped or are ambiguous. See the Output channel."
 }

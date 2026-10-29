@@ -301,10 +301,6 @@
       ],
       "commandPalette": [
         {
-          "command": "csharpWorkbench.syncNamespaces",
-          "when": "false"
-        },
-        {
           "command": "csharpWorkbench.manageNuget"
         },
         {

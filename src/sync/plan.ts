@@ -16,7 +16,7 @@ import { namespaceFor } from '../solution/naming';
 import { analyzeCs, type CsFileInfo, type UsingDirective } from './csTokens';
 
 export interface SyncInputFile { path: string; text: string; projectDir: string; rootNamespace: string; inScope: boolean }
-export interface TextEdit { start: number; end: number; newText: string }
+export interface TextEdit { start: number; end: number; newText: string; kind: 'declaration' | 'using' | 'qualified' }
 export interface SyncPlan {
   edits: Map<string, TextEdit[]>;
   skipped: { path: string; reason: 'noNamespace' | 'multipleNamespaces' | 'nested' | 'preprocessor' }[];
@@ -85,7 +85,7 @@ export function planSync(files: SyncInputFile[]): SyncPlan {
         const ns = info.namespaces[0];
         const expected = namespaceFor(f.rootNamespace, f.projectDir, dirname(f.path));
         if (ns.name !== expected) {
-          add(f.path, { start: ns.nameStart, end: ns.nameEnd, newText: expected });
+          add(f.path, { start: ns.nameStart, end: ns.nameEnd, newText: expected, kind: 'declaration' });
           plan.moves.push({ from: ns.name, to: expected, types: [...info.typeNames] });
           moved = expected;
           oldNsOf.set(f.path, ns.name);
@@ -114,7 +114,7 @@ export function planSync(files: SyncInputFile[]): SyncPlan {
       if (to === undefined) continue;
       const stays = postTypes.get(prefix)?.has(segs[k]) ?? false;
       if (to.size === 1 && !stays) {
-        if (text.slice(start, start + prefix.length) === prefix) add(path, { start, end: start + prefix.length, newText: [...to][0] });
+        if (text.slice(start, start + prefix.length) === prefix) add(path, { start, end: start + prefix.length, newText: [...to][0], kind: 'qualified' });
       } else if (!ambKeys.has(`${prefix}\0${segs[k]}`)) {
         ambKeys.add(`${prefix}\0${segs[k]}`);
         plan.ambiguous.push({ from: prefix, type: segs[k], targets: [...(stays ? [prefix] : []), ...[...to].sort()].sort() });
@@ -154,12 +154,12 @@ export function planSync(files: SyncInputFile[]): SyncPlan {
           const { lineStart, indent, alone } = indentOf(u);
           const after = /^[ \t]*(\/\/[^\r\n]*)?(\r\n|\n|\r|$)/.exec(text.slice(u.end));
           const whole = alone && after;
-          const edit = { start: whole ? lineStart : u.start, end: whole ? u.end + after![0].length : u.end, newText: '' };
+          const edit = { start: whole ? lineStart : u.start, end: whole ? u.end + after![0].length : u.end, newText: '', kind: 'using' as const };
           add(f.path, edit);
           deleted.set(u, { edit, alone: !!whole, indent });
           continue;
         }
-        add(f.path, { start: u.nameStart, end: u.nameEnd, newText: cand[0] });
+        add(f.path, { start: u.nameStart, end: u.nameEnd, newText: cand[0], kind: 'using' });
         imported.add(cand[0]);
         extra = cand.slice(1);
       } else extra = targets.filter((t) => !own.has(t) && !imported.has(t));
@@ -167,7 +167,7 @@ export function planSync(files: SyncInputFile[]): SyncPlan {
       const head = `${u.isGlobal ? 'global ' : ''}using ${u.globalQualified ? 'global::' : ''}`;
       const nextEol = /^(\r\n|\n|\r)/.exec(text.slice(insertPos(u)))?.[0] ?? eol;
       const pos = insertPos(u);
-      add(f.path, { start: pos, end: pos, newText: extra.map((t) => `${nextEol}${indentOf(u).indent}${head}${t};`).join('') });
+      add(f.path, { start: pos, end: pos, newText: extra.map((t) => `${nextEol}${indentOf(u).indent}${head}${t};`).join(''), kind: 'using' });
       extra.forEach((t) => imported.add(t));
     }
 
@@ -190,7 +190,7 @@ export function planSync(files: SyncInputFile[]): SyncPlan {
           del.edit.newText = need.map((t) => `${pad}using ${t};`).join(eol) + (del.alone ? eol : '');
         } else {
           const pos = insertPos(anchor);
-          add(f.path, { start: pos, end: pos, newText: need.map((t) => `${eol}${indent}using ${t};`).join('') });
+          add(f.path, { start: pos, end: pos, newText: need.map((t) => `${eol}${indent}using ${t};`).join(''), kind: 'using' });
         }
       } else {
         const code = info.firstCodeStart;
@@ -201,8 +201,8 @@ export function planSync(files: SyncInputFile[]): SyncPlan {
           let ls = Math.max(text.lastIndexOf('\n', code - 1), text.lastIndexOf('\r', code - 1)) + 1;
           if (ls === 0 && text.charCodeAt(0) === 0xfeff) ls = 1;
           const before = text.slice(ls, code);
-          if (/^[ \t]*$/.test(before)) add(f.path, { start: ls, end: ls, newText: lines + gap });
-          else add(f.path, { start: code - /[ \t]*$/.exec(before)![0].length, end: code, newText: eol + lines + gap });
+          if (/^[ \t]*$/.test(before)) add(f.path, { start: ls, end: ls, newText: lines + gap, kind: 'using' });
+          else add(f.path, { start: code - /[ \t]*$/.exec(before)![0].length, end: code, newText: eol + lines + gap, kind: 'using' });
         }
       }
     }

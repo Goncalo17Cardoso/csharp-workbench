@@ -24,9 +24,9 @@ import { selectTargets } from './workspace/targets';
 /** Returned from activate() for the integration tests; production code never sets the hooks. */
 export interface ExtensionApi extends PanelTestHooks {
   send(targetPath: string, msg: ToHost): Promise<void>;
-  /** Solution Explorer hooks (Test mode only). `run` executes `csharpWorkbench.<command>`. */
   /** Test mode only: Sync Namespaces applies without the refactor preview. */
   syncSkipConfirmation?: boolean;
+  /** Solution Explorer hooks (Test mode only). `run` executes `csharpWorkbench.<command>`. */
   solution?: { core: SolutionTreeCore; run(command: string, ...args: unknown[]): Promise<unknown> };
 }
 

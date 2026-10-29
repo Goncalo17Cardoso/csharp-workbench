@@ -93,7 +93,10 @@ describe('task 11 final menus', () => {
   it('commands are hidden from the palette except the allowed ones', () => {
     const shown = menus.commandPalette.filter((m) => m.when !== 'false').map((m) => m.command);
     expect(shown.sort()).toEqual(['csharpWorkbench.manageNuget']);
+    // syncNamespaces has no palette entry, so it is visible in the palette by default
+    expect(menus.commandPalette.some((m) => m.command === 'csharpWorkbench.syncNamespaces')).toBe(false);
     expect(menus.commandPalette.some((m) => m.command === 'csharpWorkbench.manageUserSecrets' && m.when === 'false')).toBe(true);
+    expect(menus.commandPalette.some((m) => m.command === 'csharpWorkbench.projectProperties.save' && m.when === 'false')).toBe(true);
   });
   it('os items cover solution but not solution folders', () => {
     for (const c of ['revealInFinder', 'openInTerminal']) {
