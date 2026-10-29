@@ -104,7 +104,7 @@ export function registerSyncCommands(deps: Deps): vscode.Disposable[] {
       for (const g of generated) deps.output.info(`Sync Namespaces: skipped ${g} (generated)`);
       for (const s of plan.skipped) {
         deps.output.info(s.reason === 'partialSplit'
-          ? vscode.l10n.t('Sync Namespaces: skipped {0} (a partial type it declares is also declared in a file that keeps its namespace)', s.path)
+          ? vscode.l10n.t('Sync Namespaces: skipped {0} (a type with the same name is declared in a file that is not being changed)', s.path)
           : `Sync Namespaces: skipped ${s.path} (${s.reason})`);
       }
       for (const a of plan.ambiguous) deps.output.info(`Sync Namespaces: ambiguous ${a.from}.${a.type} -> ${a.targets.join(', ')}`);

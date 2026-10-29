@@ -48,6 +48,7 @@ Right-click a project in the Solution Explorer and choose **Properties** (or run
 - Properties defined with a `Condition` (or per configuration) are shown read-only, with an **Open in .csproj** link.
 - Duplicated properties are flagged; the last occurrence is the one edited.
 - If the project cannot be evaluated, the page opens read-only with the error.
+- Known limitation: when the target framework list contains an MSBuild expression such as `$(ExtraTfms)`, changing frameworks from the page fails validation and the file is restored; edit that list by hand in the `.csproj`.
 
 ### The `.csproj` property editor exception
 

@@ -192,6 +192,6 @@
   "Evaluated: {0}": "Evaluated: {0}",
   "from .csproj, not evaluated": "from .csproj, not evaluated",
   "{0}: {1}": "{0}: {1}",
-  "Sync Namespaces: skipped {0} (a partial type it declares is also declared in a file that keeps its namespace)": "Sync Namespaces: skipped {0} (a partial type it declares is also declared in a file that keeps its namespace)",
+  "Sync Namespaces: skipped {0} (a type with the same name is declared in a file that is not being changed)": "Sync Namespaces: skipped {0} (a type with the same name is declared in a file that is not being changed)",
   "Sync Namespaces: the root namespace of {0} could not be evaluated; its namespace declarations are left unchanged.": "Sync Namespaces: the root namespace of {0} could not be evaluated; its namespace declarations are left unchanged."
 }
