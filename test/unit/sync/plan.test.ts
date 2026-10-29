@@ -94,8 +94,8 @@ describe('planSync', () => {
 
   it('folder named 2D and class keyword folder use namespaceFor sanitising', () => {
     const { out } = run([f('2D/A.cs', 'namespace X;\nclass A {}\n'), f('class/B.cs', 'namespace X;\nclass B {}\n')]);
-    expect(out(0)).toBe('namespace MyApp._2D;\nclass A {}\n');
-    expect(out(1)).toBe('namespace MyApp.@class;\nclass B {}\n');
+    expect(out(0)).toBe('using MyApp.@class;\n\nnamespace MyApp._2D;\nclass A {}\n');
+    expect(out(1)).toBe('using MyApp._2D;\n\nnamespace MyApp.@class;\nclass B {}\n');
   });
 
   it('no change when already in sync gives empty plan', () => {
@@ -110,8 +110,105 @@ describe('planSync', () => {
       f('B/X.cs', 'namespace MyApp.A;\nclass X {}\n'), f('A/Y.cs', 'namespace MyApp.B;\nclass Y {}\n'),
       f('P.cs', 'class P { MyApp.A.X x; MyApp.B.Y y; }\n'),
     ]);
-    expect(out(0)).toBe('namespace MyApp.B;\nclass X {}\n');
-    expect(out(1)).toBe('namespace MyApp.A;\nclass Y {}\n');
+    expect(out(0)).toBe('using MyApp.A;\n\nnamespace MyApp.B;\nclass X {}\n');
+    expect(out(1)).toBe('using MyApp.B;\n\nnamespace MyApp.A;\nclass Y {}\n');
     expect(out(2)).toBe('class P { MyApp.B.X x; MyApp.A.Y y; }\n');
   });
+
+  // ---- review fixes ----
+  const replan = (files: SyncInputFile[], plan: ReturnType<typeof planSync>) =>
+    planSync(files.map((x) => ({ ...x, text: apply(x.text, plan.edits.get(x.path)) })));
+
+  it('nested namespace declaration keeps Old alive', () => {
+    const files = [
+      f('Domain/C.cs', 'namespace MyApp.Models;\nclass C {}\n'),
+      f('Lib/Other.cs', 'namespace MyApp { namespace Models { class Other {} } }\n', false),
+      f('P.cs', 'using MyApp.Models;\nclass P {}\n', false),
+    ];
+    const { out } = run(files);
+    expect(out(2)).toBe('using MyApp.Models;\nusing MyApp.Domain;\nclass P {}\n');
+  });
+
+  it('partial class left in Old is not rewritten and is reported ambiguous', () => {
+    const files = [
+      f('Domain/Customer.cs', 'namespace MyApp.Models;\npartial class Customer {}\n'),
+      f('Models/Customer2.cs', 'namespace MyApp.Models;\npartial class Customer {}\n'),
+      f('P.cs', 'class P { MyApp.Models.Customer c; }\n', false),
+    ];
+    const { plan, out } = run(files);
+    expect(out(2)).toBe('class P { MyApp.Models.Customer c; }\n');
+    expect(plan.ambiguous).toHaveLength(1);
+    expect(plan.ambiguous[0]).toMatchObject({ from: 'MyApp.Models', type: 'Customer' });
+  });
+
+  it('out-of-scope declaration of the same type blocks the rewrite', () => {
+    const { plan, out } = run([
+      f('Domain/Customer.cs', 'namespace MyApp.Models;\nclass Customer {}\n'),
+      f('Lib/C.cs', 'namespace MyApp.Models;\nclass Customer {}\n', false),
+      f('P.cs', 'class P { MyApp.Models.Customer c; MyApp.Models.Customer d; }\n', false),
+    ]);
+    expect(out(2)).toBe('class P { MyApp.Models.Customer c; MyApp.Models.Customer d; }\n');
+    expect(plan.ambiguous).toHaveLength(1);
+  });
+
+  it('same type moved to two targets is ambiguous', () => {
+    const { plan, out } = run([
+      f('A/C.cs', 'namespace Old;\nclass C {}\n'), f('B/C.cs', 'namespace Old;\nclass C {}\n'),
+      f('P.cs', 'class P { Old.C c; }\n', false),
+    ]);
+    expect(out(2)).toBe('class P { Old.C c; }\n');
+    expect(plan.ambiguous).toEqual([{ from: 'Old', type: 'C', targets: ['MyApp.A', 'MyApp.B'] }]);
+  });
+
+  it('moved file gets using Old when Old still exists, and replan is empty', () => {
+    const files = [
+      f('Domain/Customer.cs', 'using System;\nnamespace MyApp.Models;\nclass Customer { Order o; }\n'),
+      f('Models/Order.cs', 'namespace MyApp.Models;\nclass Order { Customer c; }\n'),
+    ];
+    const { plan, out } = run(files);
+    expect(out(0)).toBe('using System;\nusing MyApp.Models;\nnamespace MyApp.Domain;\nclass Customer { Order o; }\n');
+    expect(replan(files, plan).edits.size).toBe(0);
+  });
+
+  it('unmoved sibling gets using Target before the namespace, BOM kept', () => {
+    const files = [
+      f('Domain/Customer.cs', 'namespace MyApp.Models;\nclass Customer {}\n'),
+      f('Models/Order.cs', '\uFEFFnamespace MyApp.Models;\r\nclass Order { Customer c; }\r\n'),
+    ];
+    const { plan, out } = run(files);
+    expect(out(1)).toBe('\uFEFFusing MyApp.Domain;\r\n\r\nnamespace MyApp.Models;\r\nclass Order { Customer c; }\r\n');
+    expect(replan(files, plan).edits.size).toBe(0);
+  });
+
+  it('split targets give each moved file the others', () => {
+    const files = [
+      f('A/X.cs', 'namespace Old;\nclass X {}\n'), f('B/Y.cs', 'namespace Old;\nclass Y {}\n'),
+    ];
+    const { plan, out } = run(files);
+    expect(out(0)).toBe('using MyApp.B;\n\nnamespace MyApp.A;\nclass X {}\n');
+    expect(out(1)).toBe('using MyApp.A;\n\nnamespace MyApp.B;\nclass Y {}\n');
+    expect(replan(files, plan).edits.size).toBe(0);
+  });
+
+  it('gone using whose target is already imported is deleted', () => {
+    const files = [
+      f('Domain/C.cs', 'namespace MyApp.Models;\nclass C {}\n'),
+      f('P.cs', 'using System;\nusing MyApp.Models;\nusing MyApp.Domain;\nclass P {}\n', false),
+    ];
+    const { plan, out } = run(files);
+    expect(out(1)).toBe('using System;\nusing MyApp.Domain;\nclass P {}\n');
+    expect(replan(files, plan).edits.size).toBe(0);
+  });
+
+  it('deleted anchor directive still receives implicit usings', () => {
+    const files = [
+      f('A/X.cs', 'using MyApp.Z;\nusing Old2;\nnamespace Old;\nclass X {}\n'),
+      f('B/Y.cs', 'namespace Old;\nclass Y {}\n'),
+      f('Z/W.cs', 'namespace Old2;\nclass W {}\n'),
+    ];
+    const { plan, out } = run(files);
+    expect(out(0)).toBe('using MyApp.Z;\nusing MyApp.B;\nnamespace MyApp.A;\nclass X {}\n');
+    expect(replan(files, plan).edits.size).toBe(0);
+  });
+
 });
