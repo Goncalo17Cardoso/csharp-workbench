@@ -28,9 +28,10 @@ export interface CsFileInfo {
   namespaces: NsDecl[]; usings: UsingDirective[]; typeNames: string[] /* top-level types per namespace */; qualified: QualifiedName[]; hasPreprocessorAroundNamespace: boolean;
   /** Any `#if` directive outside comments and strings. */
   hasConditional: boolean;
-  /** Start of the first top-level `[attribute]` list before any namespace; usings must precede it. */
-  firstHeaderStart?: number;
-  /** End (after `;`) of the last top-level `extern alias` before any namespace; usings must follow it. */
+  /** Start of the first top-level token that is not part of an `extern alias` directive (attribute list,
+   *  using, namespace, type or statement); undefined when the file has no code. */
+  firstCodeStart?: number;
+  /** End (after `;`) of the last top-level `extern alias` before any namespace. */
   lastExternAliasEnd?: number;
 }
 
@@ -353,12 +354,13 @@ export function analyzeCs(text: string): CsFileInfo {
       }
     } else {
       if (stack.length === 0 && !fileScoped && info.namespaces.length === 0) {
-        if (info.firstHeaderStart === undefined && isP(t, '[') && atBoundary(i)) info.firstHeaderStart = t.start;
         if (isId(t, 'extern') && isId(toks[i + 1], 'alias')) {
           let j = i + 2;
           while (j < toks.length && !isP(toks[j], ';')) j++;
           if (j < toks.length) info.lastExternAliasEnd = toks[j].end;
+          if (info.firstCodeStart === undefined) { i = j + 1; continue; } // still the header: skip the directive
         }
+        info.firstCodeStart ??= t.start;
       }
       if (isP(t, '{')) { stack.push('other'); i++; continue; }
       if (isP(t, '}')) { stack.pop(); i++; continue; }

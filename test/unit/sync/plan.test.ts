@@ -243,11 +243,43 @@ describe('planSync', () => {
   });
 
   it('an indexer is not an attribute list', () => {
-    const { out } = run([
+    const files = [
       f('Domain/C.cs', 'namespace MyApp.Models;\nclass C {}\n'),
-      f('Models/D.cs', 'var a = args[0];\nnamespace MyApp.Models;\nclass D {}\n'),
-    ]);
-    expect(out(1)).toBe('var a = args[0];\nusing MyApp.Domain;\n\nnamespace MyApp.Models;\nclass D {}\n');
+      f('Models/D.cs', 'System.Console.WriteLine(args[0]);\nnamespace MyApp.Models { class D {} }\n'),
+    ];
+    const { plan, out } = run(files);
+    expect(out(1)).toBe('using MyApp.Domain;\n\nSystem.Console.WriteLine(args[0]);\nnamespace MyApp.Models { class D {} }\n');
+    expect(replan(files, plan).edits.size).toBe(0);
+  });
+
+  // With no usings, new usings go at the first top-level token that is not an `extern alias`
+  // (attribute list, namespace, type or top-level statement). Leading comments stay above them.
+  const domain = f('Domain/C.cs', 'namespace MyApp.Models;\nclass C {}\n');
+  it.each([
+    ['comment after extern alias', 'extern alias Z; /* c */\nnamespace MyApp.Models { class D {} }\n',
+      'extern alias Z; /* c */\nusing MyApp.Domain;\nnamespace MyApp.Models { class D {} }\n'],
+    ['attribute after extern alias', 'extern alias Z; [assembly: X]\nnamespace MyApp.Models { class D {} }\n',
+      'extern alias Z;\nusing MyApp.Domain;\n[assembly: X]\nnamespace MyApp.Models { class D {} }\n'],
+    ['namespace after extern alias', 'extern alias Z; namespace MyApp.Models { class D {} }',
+      'extern alias Z;\nusing MyApp.Domain;\nnamespace MyApp.Models { class D {} }'],
+    ['top-level statements', 'var a = args[0];\nnamespace MyApp.Models { class D {} }\n',
+      'using MyApp.Domain;\n\nvar a = args[0];\nnamespace MyApp.Models { class D {} }\n'],
+    ['BOM and leading comment', '\uFEFF// header\r\nnamespace MyApp.Models;\r\nclass D {}\r\n',
+      '\uFEFF// header\r\nusing MyApp.Domain;\r\n\r\nnamespace MyApp.Models;\r\nclass D {}\r\n'],
+    ['same-line leading block comment', '/* lic */ [assembly: X]\nnamespace MyApp.Models;\nclass D {}\n',
+      '/* lic */\nusing MyApp.Domain;\n\n[assembly: X]\nnamespace MyApp.Models;\nclass D {}\n'],
+  ])('no usings, %s: usings go at the first code token', (_name, input, expected) => {
+    const files = [domain, f('Models/D.cs', input)];
+    const { plan, out } = run(files);
+    expect(out(1)).toBe(expected);
+    expect(replan(files, plan).edits.size).toBe(0);
+  });
+
+  it('a file with only comments gets no insertion', () => {
+    const files = [domain, f('Models/D.cs', '\uFEFF// namespace MyApp.Models;\n/* class D {} */\n')];
+    const plan = planSync(files);
+    expect(plan.edits.has(files[1].path)).toBe(false);
+    expect(replan(files, plan).edits.size).toBe(0);
   });
 
   it('two inserts at the same offset merge into one edit in a fixed order', () => {
