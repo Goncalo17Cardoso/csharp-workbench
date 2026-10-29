@@ -222,14 +222,32 @@ describe('planSync', () => {
     expect(replan(files, plan).edits.size).toBe(0);
   });
 
-  it('usings go before extern alias and attributes (file-scoped form)', () => {
+  it('usings go after extern alias and before module attributes', () => {
     const files = [
       f('Domain/C.cs', 'namespace MyApp.Models;\nclass C {}\n'),
       f('Models/D.cs', 'extern alias Z;\n[module: System.CLSCompliant(true)]\nnamespace MyApp.Models;\nclass D {}\n'),
     ];
     const { plan, out } = run(files);
-    expect(out(1).startsWith('using MyApp.Domain;\n\nextern alias Z;\n[module:')).toBe(true);
+    expect(out(1)).toBe('extern alias Z;\nusing MyApp.Domain;\n[module: System.CLSCompliant(true)]\nnamespace MyApp.Models;\nclass D {}\n');
     expect(replan(files, plan).edits.size).toBe(0);
+  });
+
+  it('extern alias alone: usings follow it', () => {
+    const files = [
+      f('Domain/C.cs', 'namespace MyApp.Models;\nclass C {}\n'),
+      f('Models/D.cs', 'extern alias Z; // c\r\nnamespace MyApp.Models\r\n{\r\n}\r\n'),
+    ];
+    const { plan, out } = run(files);
+    expect(out(1)).toBe('extern alias Z; // c\r\nusing MyApp.Domain;\r\nnamespace MyApp.Models\r\n{\r\n}\r\n');
+    expect(replan(files, plan).edits.size).toBe(0);
+  });
+
+  it('an indexer is not an attribute list', () => {
+    const { out } = run([
+      f('Domain/C.cs', 'namespace MyApp.Models;\nclass C {}\n'),
+      f('Models/D.cs', 'var a = args[0];\nnamespace MyApp.Models;\nclass D {}\n'),
+    ]);
+    expect(out(1)).toBe('var a = args[0];\nusing MyApp.Domain;\n\nnamespace MyApp.Models;\nclass D {}\n');
   });
 
   it('two inserts at the same offset merge into one edit in a fixed order', () => {

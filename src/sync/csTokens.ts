@@ -28,8 +28,10 @@ export interface CsFileInfo {
   namespaces: NsDecl[]; usings: UsingDirective[]; typeNames: string[] /* top-level types per namespace */; qualified: QualifiedName[]; hasPreprocessorAroundNamespace: boolean;
   /** Any `#if` directive outside comments and strings. */
   hasConditional: boolean;
-  /** Start of the first top-level `[attribute]` list or `extern alias` before any namespace; usings must precede it. */
+  /** Start of the first top-level `[attribute]` list before any namespace; usings must precede it. */
   firstHeaderStart?: number;
+  /** End (after `;`) of the last top-level `extern alias` before any namespace; usings must follow it. */
+  lastExternAliasEnd?: number;
 }
 
 interface Tok { k: 'id' | 'p' | 'lit'; text: string; start: number; end: number; pp: number }
@@ -350,8 +352,14 @@ export function analyzeCs(text: string): CsFileInfo {
         continue;
       }
     } else {
-      if (info.firstHeaderStart === undefined && stack.length === 0 && !fileScoped && info.namespaces.length === 0
-        && (isP(t, '[') || (isId(t, 'extern') && isId(toks[i + 1], 'alias')))) info.firstHeaderStart = t.start;
+      if (stack.length === 0 && !fileScoped && info.namespaces.length === 0) {
+        if (info.firstHeaderStart === undefined && isP(t, '[') && atBoundary(i)) info.firstHeaderStart = t.start;
+        if (isId(t, 'extern') && isId(toks[i + 1], 'alias')) {
+          let j = i + 2;
+          while (j < toks.length && !isP(toks[j], ';')) j++;
+          if (j < toks.length) info.lastExternAliasEnd = toks[j].end;
+        }
+      }
       if (isP(t, '{')) { stack.push('other'); i++; continue; }
       if (isP(t, '}')) { stack.pop(); i++; continue; }
       if (nsCtx() && t.k === 'id') {

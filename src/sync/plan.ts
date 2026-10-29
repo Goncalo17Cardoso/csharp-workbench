@@ -195,11 +195,19 @@ export function planSync(files: SyncInputFile[]): SyncPlan {
       } else {
         const ns = info.namespaces.find((n) => n.depth === 0);
         if (ns) {
-          const kw = info.firstHeaderStart ?? text.lastIndexOf('namespace', ns.nameStart);
-          const ls = Math.max(text.lastIndexOf('\n', kw - 1), text.lastIndexOf('\r', kw - 1)) + 1;
-          let pos = /^[ \t]*$/.test(text.slice(ls, kw)) ? ls : kw;
-          if (pos === 0 && text.charCodeAt(0) === 0xfeff) pos = 1;
-          add(f.path, { start: pos, end: pos, newText: need.map((t) => `using ${t};`).join(eol) + eol + eol });
+          const ext = info.lastExternAliasEnd;
+          const lines = need.map((t) => `using ${t};`).join(eol);
+          if (ext !== undefined) {
+            const nl = /^[ \t]*(\/\/[^\r\n]*)?(\r\n|\n|\r)/.exec(text.slice(ext));
+            if (nl) add(f.path, { start: ext + nl[0].length, end: ext + nl[0].length, newText: lines + eol });
+            else add(f.path, { start: text.length, end: text.length, newText: eol + lines + eol });
+          } else {
+            const kw = info.firstHeaderStart ?? text.lastIndexOf('namespace', ns.nameStart);
+            const ls = Math.max(text.lastIndexOf('\n', kw - 1), text.lastIndexOf('\r', kw - 1)) + 1;
+            let pos = /^[ \t]*$/.test(text.slice(ls, kw)) ? ls : kw;
+            if (pos === 0 && text.charCodeAt(0) === 0xfeff) pos = 1;
+            add(f.path, { start: pos, end: pos, newText: lines + eol + eol });
+          }
         }
       }
     }
