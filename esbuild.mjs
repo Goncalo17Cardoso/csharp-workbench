@@ -8,6 +8,8 @@ const options = {
   format: 'cjs',
   target: 'node20',
   external: ['vscode'],
+  // jsonc-parser's UMD entry ("main") uses dynamic requires that fail once bundled; use its ESM build.
+  mainFields: ['module', 'main'],
   sourcemap: true,
 };
 
@@ -21,6 +23,12 @@ const webviewOptions = {
   sourcemap: true,
 };
 
+const propsOptions = {
+  ...webviewOptions,
+  entryPoints: ['src/webview/properties/main.ts'],
+  outfile: 'dist/webview/properties.js',
+};
+
 if (process.argv.includes('--tests')) {
   // Integration tests run inside the VS Code extension host: bundle each *.e2e.test.ts to out/.
   const { globSync } = await import('node:fs');
@@ -32,12 +40,15 @@ if (process.argv.includes('--tests')) {
     format: 'cjs',
     target: 'node20',
     external: ['vscode', 'mocha'],
+    mainFields: ['module', 'main'],
     sourcemap: true,
   });
 } else if (process.argv.includes('--watch')) {
   await (await context(options)).watch();
   await (await context(webviewOptions)).watch();
+  await (await context(propsOptions)).watch();
 } else {
   await build(options);
   await build(webviewOptions);
+  await build(propsOptions);
 }

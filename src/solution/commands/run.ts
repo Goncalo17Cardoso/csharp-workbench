@@ -1,10 +1,12 @@
 import * as fsp from 'node:fs/promises';
 import * as path from 'node:path';
 import * as vscode from 'vscode';
+import { getActiveProfileName, resolveActiveProfile, setActiveProfileName } from '../../launch/activeProfile';
+import { launchSettingsPath, parseProfiles, type LaunchProfile } from '../../launch/launchSettings';
 import type { DotnetCli } from '../../dotnet/cli';
 import type { TreeNode } from '../model';
 import { readProjectInfo } from '../projectInfo';
-import { createEndWaiter, debugConfigFor, dotnetTask, runTfm, targetPathStep, type TaskKind } from '../runCore';
+import { createEndWaiter, debugConfigFor, dotnetTask, executableRun, profileDebugConfigs, runTfm, targetPathStep, type TaskKind } from '../runCore';
 import { loadSolution } from '../slnParse';
 import type { SolutionTreeProvider } from '../SolutionTreeProvider';
 import { getStartupProject, setStartupProject } from '../state';
@@ -29,10 +31,10 @@ export function registerRunCommands(deps: Deps): vscode.Disposable[] {
   const fail = (e: unknown) => void vscode.window.showErrorMessage(errText(e));
 
   /** Runs a dotnet task; resolves with the process exit code (undefined if it never ran or was killed). */
-  async function runTask(kind: TaskKind, target: string, wait: boolean, tfm?: string): Promise<number | undefined> {
+  async function runTask(kind: TaskKind, target: string, wait: boolean, tfm?: string, launchProfile?: string): Promise<number | undefined> {
     const dotnet = await deps.resolveDotnet();
     if (!dotnet) { fail(new Error(vscode.l10n.t('The .NET SDK was not found'))); return undefined; }
-    const { name, args } = dotnetTask(kind, target, dotnet, tfm);
+    const { name, args } = dotnetTask(kind, target, dotnet, tfm, launchProfile);
     const task = new vscode.Task(
       { type: 'csharpWorkbench', kind, target }, vscode.TaskScope.Workspace, name, 'C# Workbench',
       new vscode.ProcessExecution(dotnet, args, { cwd: path.dirname(target) }), ['$msCompile'],
@@ -50,6 +52,11 @@ export function registerRunCommands(deps: Deps): vscode.Disposable[] {
   }
 
   const solutionPath = () => core.solutionPath;
+
+  const profilesOf = async (project: string): Promise<LaunchProfile[]> => {
+    try { return parseProfiles(await readText(launchSettingsPath(project))); } catch { return []; }
+  };
+  const activeProfileOf = async (project: string) => resolveActiveProfile(await profilesOf(project), getActiveProfileName(ws, project));
 
   async function pickStartup(): Promise<string | undefined> {
     const sln = solutionPath();
@@ -94,8 +101,18 @@ export function registerRunCommands(deps: Deps): vscode.Disposable[] {
   async function runProject(project: string | undefined): Promise<void> {
     if (!project) return;
     try {
+      const profile = await activeProfileOf(project);
+      if (profile?.commandName === 'Executable') {
+        const spec = executableRun(profile, path.dirname(project), process.env);
+        if (!spec.file) { fail(new Error(vscode.l10n.t('The launch profile has no executable path.'))); return; }
+        await vscode.tasks.executeTask(new vscode.Task(
+          { type: 'csharpWorkbench', kind: 'run', target: project }, vscode.TaskScope.Workspace, spec.name, 'C# Workbench',
+          new vscode.ProcessExecution(spec.file, spec.args, { cwd: spec.cwd, env: spec.env }),
+        ));
+        return;
+      }
       const tfm = runTfm(await tfmsOf(project));
-      await runTask('run', project, false, tfm);
+      await runTask('run', project, false, tfm, profile?.name);
     } catch (e) { fail(e); }
   }
 
@@ -113,7 +130,9 @@ export function registerRunCommands(deps: Deps): vscode.Disposable[] {
     const folder = vscode.workspace.getWorkspaceFolder(vscode.Uri.file(project));
     let started = false;
     try {
-      started = await vscode.debug.startDebugging(folder, debugConfigFor(project, program, projName(project)));
+      const profile = await activeProfileOf(project);
+      started = await vscode.debug.startDebugging(folder, debugConfigFor(
+        project, program, profile ? `${projName(project)} (${profile.name})` : projName(project), profile, process.env));
     } catch (e) { fail(e); return; }
     if (!started) {
       const run = vscode.l10n.t('Run');
@@ -134,17 +153,18 @@ export function registerRunCommands(deps: Deps): vscode.Disposable[] {
   const reg = (id: string, fn: (...a: never[]) => unknown) => vscode.commands.registerCommand(`csharpWorkbench.${id}`, fn as (...a: unknown[]) => unknown);
 
   const provider2: vscode.DebugConfigurationProvider = {
-    provideDebugConfigurations() {
+    async provideDebugConfigurations() {
       const sln = solutionPath();
       const proj = sln ? getStartupProject(ws, sln) : undefined;
       if (!proj) return [];
-      return [{ ...debugConfigFor(proj, '', projName(proj)), program: '', csharpWorkbenchProject: proj }];
+      return profileDebugConfigs(proj, projName(proj), await profilesOf(proj), process.env);
     },
     async resolveDebugConfigurationWithSubstitutedVariables(_f, config) {
       const proj = config.csharpWorkbenchProject as string | undefined;
       if (!proj) return config;
       const program = await buildForDebug(proj);
-      return program ? { ...config, program } : undefined;
+      if (!program) return undefined;
+      return config.csharpWorkbenchKeepProgram ? config : { ...config, program };
     },
   };
 
@@ -162,6 +182,26 @@ export function registerRunCommands(deps: Deps): vscode.Disposable[] {
       if (!sln) { void vscode.window.showInformationMessage(vscode.l10n.t('No solution is open.')); return; }
       if (!p) return;
       await setStartupProject(ws, sln, p);
+      void vscode.commands.executeCommand('csharpWorkbench.refresh');
+    }),
+    reg('selectLaunchProfile', async (n?: TreeNode) => {
+      const sln = solutionPath();
+      const project = projectOf(n) ?? (sln ? getStartupProject(ws, sln) : undefined);
+      if (!project) { void vscode.window.showInformationMessage(vscode.l10n.t('Select the startup project')); return; }
+      const profiles = await profilesOf(project);
+      if (!profiles.length) { void vscode.window.showInformationMessage(vscode.l10n.t('This project has no launch profiles.')); return; }
+      const active = resolveActiveProfile(profiles, getActiveProfileName(ws, project));
+      const pick = await vscode.window.showQuickPick(
+        profiles.map((p) => ({
+          label: p.name,
+          description: p.supported ? (p.name === active?.name ? vscode.l10n.t('(active)') : '') : vscode.l10n.t('not supported on this system'),
+          profile: p,
+        })),
+        { placeHolder: vscode.l10n.t('Select a launch profile') },
+      );
+      if (!pick) return;
+      if (!pick.profile.supported) { void vscode.window.showWarningMessage(vscode.l10n.t('not supported on this system')); return; }
+      await setActiveProfileName(ws, project, pick.profile.name);
       void vscode.commands.executeCommand('csharpWorkbench.refresh');
     }),
     reg('runStartup', async () => runProject(await pickStartup())),

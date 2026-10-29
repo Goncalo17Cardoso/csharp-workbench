@@ -1,0 +1,24 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<!-- Hand-made by Visual Studio style: BOM, CRLF, tabs -->
+<Project Sdk="Microsoft.NET.Sdk">
+
+	<!-- Main settings -->
+	<PropertyGroup Label="Globals">
+		<OutputType>Exe</OutputType>
+		<TargetFramework>net8.0</TargetFramework>
+		<!-- <RootNamespace>Old</RootNamespace> -->
+		<Nullable />
+		<Company>Smith &amp; Sons</Company>
+		<AssemblyName Label="name">HandMade</AssemblyName>
+	</PropertyGroup>
+
+	<PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
+		<Optimize>true</Optimize>
+		<DefineConstants>TRACE;RELEASE</DefineConstants>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<Compile Remove="Old\**" />
+	</ItemGroup>
+
+</Project>

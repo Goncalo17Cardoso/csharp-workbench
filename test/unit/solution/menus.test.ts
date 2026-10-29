@@ -64,7 +64,10 @@ describe('task 11 final menus', () => {
   const ctx = menus['view/item/context'] as Array<{ command?: string; submenu?: string; when?: string; group?: string }>;
   const VALUES = ['cw.solution', 'cw.solutionFolder', 'cw.project', 'cw.project.startup', 'cw.folder', 'cw.file', 'cw.packages', 'cw.package', 'cw.projectRefs', 'cw.projectRef'];
   it('every entry has group@order', () => {
-    for (const m of ctx) expect(m.group, m.command ?? m.submenu).toMatch(/^[1-7]_[a-z]+@\d+(\.\d+)?$/);
+    for (const m of ctx) {
+      const re = m.command === 'csharpWorkbench.projectProperties' ? /^9_properties@1$/ : m.command === 'csharpWorkbench.syncNamespaces' ? /^8_sync@1$/ : /^[1-7]_[a-z]+@\d+(\.\d+)?$/;
+      expect(m.group, m.command ?? m.submenu).toMatch(re);
+    }
   });
   it('no command twice in the same menu with overlapping when', () => {
     for (const [name, list] of Object.entries(menus)) {
@@ -90,7 +93,10 @@ describe('task 11 final menus', () => {
   it('commands are hidden from the palette except the allowed ones', () => {
     const shown = menus.commandPalette.filter((m) => m.when !== 'false').map((m) => m.command);
     expect(shown.sort()).toEqual(['csharpWorkbench.manageNuget']);
+    // syncNamespaces has no palette entry, so it is visible in the palette by default
+    expect(menus.commandPalette.some((m) => m.command === 'csharpWorkbench.syncNamespaces')).toBe(false);
     expect(menus.commandPalette.some((m) => m.command === 'csharpWorkbench.manageUserSecrets' && m.when === 'false')).toBe(true);
+    expect(menus.commandPalette.some((m) => m.command === 'csharpWorkbench.projectProperties.save' && m.when === 'false')).toBe(true);
   });
   it('os items cover solution but not solution folders', () => {
     for (const c of ['revealInFinder', 'openInTerminal']) {
@@ -118,5 +124,28 @@ describe('solution-only menus', () => {
   it('found every entry', () => expect(new Set(entries.map((m) => m.command)).size).toBe(SOLUTION_ONLY.length));
   it('require an open solution', () => {
     for (const m of entries.filter((x) => x.when !== 'false')) expect(m.when, m.command).toMatch(/(^|&& )csharpWorkbench\.hasSolution( &&|$)/);
+  });
+});
+
+describe('project properties menu', () => {
+  const item = menus['view/item/context'].find((m) => m.command === 'csharpWorkbench.projectProperties')!;
+  it('Properties appears for cw.project and cw.project.startup but not cw.projectRef', () => {
+    expect(regexOf(item.when!).test('cw.project')).toBe(true);
+    expect(regexOf(item.when!).test('cw.project.startup')).toBe(true);
+    expect(regexOf(item.when!).test('cw.projectRef')).toBe(false);
+    expect(regexOf(item.when!).test('cw.projects')).toBe(false);
+  });
+  it('save command is hidden from the palette', () => {
+    expect(menus.commandPalette.some((m) => m.command === 'csharpWorkbench.projectProperties.save' && m.when === 'false')).toBe(true);
+  });
+});
+
+describe('sync namespaces menu', () => {
+  const item = menus['view/item/context'].find((m) => m.command === 'csharpWorkbench.syncNamespaces')!;
+  it('Sync Namespaces on cw.project* and cw.solution, not on folders or projectRef', () => {
+    const re = regexOf(item.when!);
+    for (const v of ['cw.solution', 'cw.project', 'cw.project.startup']) expect(re.test(v), v).toBe(true);
+    for (const v of ['cw.solutionFolder', 'cw.folder', 'cw.file', 'cw.projectRef', 'cw.projectRefs', 'cw.projects']) expect(re.test(v), v).toBe(false);
+    expect((item as { group?: string }).group).toBe('8_sync@1');
   });
 });

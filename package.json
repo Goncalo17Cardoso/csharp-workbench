@@ -2,7 +2,7 @@
   "name": "csharp-workbench",
   "displayName": "C# Workbench",
   "description": "A Visual Studio-style NuGet package manager for .NET solutions and projects in VS Code.",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "publisher": "TODO-publisher",
   "engines": {
     "vscode": "^1.95.0"
@@ -13,15 +13,17 @@
     "build": "node esbuild.mjs",
     "watch": "node esbuild.mjs --watch",
     "test:unit": "node scripts/vitest-safe.mjs run --exclude '**/*.int.test.ts' --exclude '**/node_modules/**'",
-    "test:cli": "node scripts/vitest-safe.mjs run test/integration/cli-cpm.int.test.ts test/integration/slnFolders.int.test.ts",
+    "test:cli": "node scripts/vitest-safe.mjs run test/integration/cli-cpm.int.test.ts test/integration/slnFolders.int.test.ts test/integration/properties.int.test.ts",
     "test:int": "node scripts/vscode-test-safe.mjs",
     "build:test": "node esbuild.mjs --tests",
-    "package": "vsce package --allow-missing-repository"
+    "vscode:prepublish": "npm run build",
+    "package": "npm run build && vsce package --allow-missing-repository"
   },
   "dependencies": {
     "dompurify": "^3.4.17",
     "fast-xml-parser": "^5.11.2",
     "fflate": "^0.8.3",
+    "jsonc-parser": "^3.3.1",
     "marked": "^18.1.2"
   },
   "devDependencies": {
@@ -185,6 +187,21 @@
         "category": "C# Workbench"
       },
       {
+        "command": "csharpWorkbench.projectProperties",
+        "title": "%command.projectProperties.title%",
+        "category": "C# Workbench"
+      },
+      {
+        "command": "csharpWorkbench.projectProperties.save",
+        "title": "%command.projectProperties.save.title%",
+        "category": "C# Workbench"
+      },
+      {
+        "command": "csharpWorkbench.syncNamespaces",
+        "title": "%command.syncNamespaces.title%",
+        "category": "C# Workbench"
+      },
+      {
         "command": "csharpWorkbench.manageNugetForSolution",
         "title": "%command.manageNugetForSolution.title%",
         "category": "C# Workbench"
@@ -235,6 +252,11 @@
         "category": "C# Workbench"
       },
       {
+        "command": "csharpWorkbench.selectLaunchProfile",
+        "title": "%command.selectLaunchProfile.title%",
+        "category": "C# Workbench"
+      },
+      {
         "command": "csharpWorkbench.runStartup",
         "title": "%command.runStartup.title%",
         "category": "C# Workbench",
@@ -260,6 +282,14 @@
         "command": "csharpWorkbench.cleanSolution",
         "title": "%command.cleanSolution.title%",
         "category": "C# Workbench"
+      }
+    ],
+    "keybindings": [
+      {
+        "command": "csharpWorkbench.projectProperties.save",
+        "key": "ctrl+s",
+        "mac": "cmd+s",
+        "when": "activeWebviewPanelId == 'csharpWorkbench.properties'"
       }
     ],
     "menus": {
@@ -416,6 +446,10 @@
         },
         {
           "command": "csharpWorkbench.manageUserSecrets",
+          "when": "false"
+        },
+        {
+          "command": "csharpWorkbench.projectProperties.save",
           "when": "false"
         }
       ],
@@ -583,6 +617,11 @@
           "group": "3_run@2"
         },
         {
+          "command": "csharpWorkbench.selectLaunchProfile",
+          "when": "viewItem =~ /^cw\\.project\\.startup$/",
+          "group": "3_run@3"
+        },
+        {
           "command": "csharpWorkbench.buildSolution",
           "when": "viewItem =~ /^cw\\.solution$/",
           "group": "2_build@0"
@@ -601,6 +640,16 @@
           "command": "csharpWorkbench.manageUserSecrets",
           "when": "viewItem =~ /^cw\\.project(\\.|$)/",
           "group": "4_manage@2"
+        },
+        {
+          "command": "csharpWorkbench.projectProperties",
+          "when": "viewItem =~ /^cw\\.project(\\.|$)/",
+          "group": "9_properties@1"
+        },
+        {
+          "command": "csharpWorkbench.syncNamespaces",
+          "when": "viewItem =~ /^cw\\.(project(\\.|$)|solution$)/",
+          "group": "8_sync@1"
         }
       ],
       "csharpWorkbench.add": [

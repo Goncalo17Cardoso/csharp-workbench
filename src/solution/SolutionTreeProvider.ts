@@ -2,6 +2,8 @@ import * as fsp from 'node:fs/promises';
 import * as path from 'node:path';
 import * as vscode from 'vscode';
 import type { DotnetCli } from '../dotnet/cli';
+import { getActiveProfileName, resolvedProfileName } from '../launch/activeProfile';
+import { launchSettingsPath } from '../launch/launchSettings';
 import { readPackageRefs } from '../workspace/projectFiles';
 import type { TreeNode } from './model';
 import { readProjectInfo } from './projectInfo';
@@ -47,6 +49,8 @@ export class SolutionTreeProvider implements vscode.TreeDataProvider<TreeNode>, 
   private readonly disposables: vscode.Disposable[] = [];
   private readonly pending = new Map<string, boolean>();
   private timer: NodeJS.Timeout | undefined;
+  /** Resolved active launch profile per startup project; '' = none. Cleared on refresh / launchSettings changes. */
+  private readonly profileNames = new Map<string, string>();
   private view: vscode.TreeView<TreeNode> | undefined;
 
   /** `getCli` resolves lazily; when dotnet is missing the project items fall back to a disk walk. */
@@ -68,6 +72,17 @@ export class SolutionTreeProvider implements vscode.TreeDataProvider<TreeNode>, 
         startupProject: (s) => getStartupProject(ws, s),
       },
     });
+  }
+
+  private profileName(project: string): string {
+    const cached = this.profileNames.get(project);
+    if (cached !== undefined) return cached;
+    this.profileNames.set(project, '');
+    void fsp.readFile(launchSettingsPath(project), 'utf8').catch(() => undefined).then((text) => {
+      const name = resolvedProfileName(text, getActiveProfileName(this.ws, project)) ?? '';
+      if (name !== '') { this.profileNames.set(project, name); this.emitter.fire(undefined); }
+    });
+    return '';
   }
 
   get treeCore(): SolutionTreeCore { return this.core; }
@@ -92,15 +107,18 @@ export class SolutionTreeProvider implements vscode.TreeDataProvider<TreeNode>, 
     };
     const watcher = vscode.workspace.createFileSystemWatcher(WATCH_GLOB);
     const folders = vscode.workspace.createFileSystemWatcher('**/*', false, true, false);
+    const launchWatcher = vscode.workspace.createFileSystemWatcher('**/Properties/launchSettings.json');
+    const launchChanged = () => { this.profileNames.clear(); this.emitter.fire(undefined); };
     this.disposables.push(
-      this.view, this.emitter, watcher, folders,
+      this.view, this.emitter, watcher, folders, launchWatcher,
+      launchWatcher.onDidCreate(launchChanged), launchWatcher.onDidChange(launchChanged), launchWatcher.onDidDelete(launchChanged),
       watcher.onDidCreate((u) => this.queue(u.fsPath, 'create')),
       watcher.onDidChange((u) => this.queue(u.fsPath, 'change')),
       watcher.onDidDelete((u) => this.queue(u.fsPath, 'delete')),
       folders.onDidCreate((u) => this.queue(u.fsPath, 'create')),
       folders.onDidDelete((u) => this.queue(u.fsPath, 'delete')),
       vscode.window.onDidChangeActiveTextEditor((e) => void this.autoReveal(e)),
-      vscode.commands.registerCommand('csharpWorkbench.refresh', () => { this.core.reset(); this.emitter.fire(undefined); }),
+      vscode.commands.registerCommand('csharpWorkbench.refresh', () => { this.profileNames.clear(); this.core.reset(); this.emitter.fire(undefined); }),
       vscode.commands.registerCommand('csharpWorkbench.toggleShowAllFiles', toggle(true)),
       vscode.commands.registerCommand('csharpWorkbench.hideAllFiles', toggle(false)),
       vscode.commands.registerCommand('csharpWorkbench.selectSolution', () => this.selectSolution()),
@@ -215,7 +233,7 @@ export class SolutionTreeProvider implements vscode.TreeDataProvider<TreeNode>, 
       if (icon) item.iconPath = new vscode.ThemeIcon(icon);
     }
     if (node.missing) item.iconPath = new vscode.ThemeIcon('warning');
-    item.description = node.contextValue.endsWith('.startup') ? vscode.l10n.t('(startup)')
+    item.description = node.contextValue.endsWith('.startup') ? (this.profileName(node.projectPath ?? '') || vscode.l10n.t('(startup)'))
       : node.missing ? vscode.l10n.t('missing')
       : node.contextValue.endsWith('.excluded') ? vscode.l10n.t('excluded') : node.description;
     if (node.kind === 'warning') item.tooltip = node.description;

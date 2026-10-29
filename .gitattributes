@@ -1,1 +1,2 @@
 test/fixtures/solution/*.sln -text
+test/fixtures/properties/*.csproj -text

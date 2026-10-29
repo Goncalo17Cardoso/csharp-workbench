@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { DotnetCli } from '../../../src/dotnet/cli';
 import type { Exec } from '../../../src/dotnet/exec';
-import { createEndWaiter, debugConfigFor, dotnetTask, runTfm, targetPathStep } from '../../../src/solution/runCore';
+import { createEndWaiter, debugConfigFor, expandEnv, executableRun, profileDebugConfigs, dotnetTask, runTfm, targetPathStep } from '../../../src/solution/runCore';
 
 describe('dotnetTask', () => {
   it('build', () => expect(dotnetTask('build', '/s/Api/MyApp.Api.csproj', 'dotnet'))
@@ -77,5 +77,66 @@ describe('createEndWaiter', () => {
   it('ignores other executions', async () => {
     const w = mk(); w.setExecution('a'); w.onProcessEnd('b', 1); w.onTaskEnd('b'); w.onProcessEnd('a', 0);
     expect(await settle(w)).toBe(0); vi.useRealTimers();
+  });
+});
+
+describe('launch profiles in run and debug', () => {
+  const prof = (o: Partial<import('../../../src/launch/launchSettings').LaunchProfile> = {}) =>
+    ({ name: 'https', commandName: 'Project', supported: true, environmentVariables: {}, ...o });
+
+  it('dotnetTask run adds --launch-profile with names containing spaces as one arg', () => {
+    expect(dotnetTask('run', '/s/A.csproj', 'dotnet', undefined, 'My Profile').args)
+      .toEqual(['run', '--project', '/s/A.csproj', '--launch-profile', 'My Profile']);
+    expect(dotnetTask('run', '/s/A.csproj', 'dotnet', 'net8.0', 'x').args)
+      .toEqual(['run', '--project', '/s/A.csproj', '-f', 'net8.0', '--launch-profile', 'x']);
+  });
+
+  it('expandEnv expands %HOME% $HOME ${HOME}', () => {
+    const env = { HOME: '/h' };
+    expect(expandEnv('%HOME%/a $HOME/b ${HOME}/c %NOPE%$NOPE', env)).toBe('/h/a /h/b /h/c ');
+  });
+
+  it('debugConfigFor sets env, ASPNETCORE_URLS, args, cwd and serverReadyAction', () => {
+    const c = debugConfigFor('/s/Api/Api.csproj', '/s/Api/bin/Api.dll', 'Api (https)', prof({
+      commandLineArgs: '--a "b c" $HOME', environmentVariables: { X: '%HOME%/x' }, applicationUrl: 'https://localhost:5001',
+      workingDirectory: 'sub', launchBrowser: true, launchUrl: 'swagger',
+    }), { HOME: '/h' }) as Record<string, unknown>;
+    expect(c.args).toEqual(['--a', 'b c', '$HOME']);
+    expect(c.env).toEqual({ X: '/h/x', ASPNETCORE_URLS: 'https://localhost:5001' });
+    expect(c.cwd).toBe('/s/Api/sub');
+    expect(c.serverReadyAction).toEqual({
+      action: 'openExternally', pattern: '\\bNow listening on:\\s+(https?://\\S+)', uriFormat: '%s/swagger',
+    });
+    expect(c.program).toBe('/s/Api/bin/Api.dll');
+  });
+
+  it('debugConfigFor without profile is unchanged', () => {
+    expect(debugConfigFor('/s/Api/Api.csproj', '/t.dll', 'Api')).toEqual({
+      type: 'coreclr', request: 'launch', name: 'C# Workbench: Api', program: '/t.dll',
+      cwd: '/s/Api', console: 'integratedTerminal', stopAtEntry: false,
+    });
+  });
+
+  it('Executable profile uses executablePath as program', () => {
+    const c = debugConfigFor('/s/A.csproj', '/t.dll', 'A', prof({ commandName: 'Executable', executablePath: '%HOME%/bin/tool', applicationUrl: 'http://x' }), { HOME: '/h' }) as Record<string, unknown>;
+    expect(c.program).toBe('/h/bin/tool');
+    expect(c.env).toBeUndefined();
+  });
+
+  it('executableRun expands path, args, cwd and env', () => {
+    const r = executableRun(prof({ name: 'tool', commandName: 'Executable', executablePath: '%HOME%/t', commandLineArgs: 'a "b c"', workingDirectory: 'w', environmentVariables: { X: '$HOME' } }), '/s/A', { HOME: '/h' });
+    expect(r).toEqual({ name: 'Run tool', file: '/h/t', args: ['a', 'b c'], cwd: '/s/A/w', env: { X: '/h' } });
+    expect(executableRun(prof({ name: 't', commandName: 'Executable', executablePath: '/x' }), '/s/A').cwd).toBe('/s/A');
+  });
+
+  it('profileDebugConfigs gives one entry per supported profile and keeps Executable program', () => {
+    const list = [prof({ name: 'web' }), prof({ name: 'iis', commandName: 'IISExpress', supported: false }),
+      prof({ name: 'tool', commandName: 'Executable', executablePath: '/bin/t' })];
+    const c = profileDebugConfigs('/s/A/A.csproj', 'A', list, {});
+    expect(c.map((x) => x.name)).toEqual(['C# Workbench: A (web)', 'C# Workbench: A (tool)']);
+    expect(c[0].program).toBe('');
+    expect(c[1].program).toBe('/bin/t');
+    expect(c[1].csharpWorkbenchKeepProgram).toBe(true);
+    expect(profileDebugConfigs('/s/A/A.csproj', 'A', [], {})).toHaveLength(1);
   });
 });

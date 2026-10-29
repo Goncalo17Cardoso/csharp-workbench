@@ -100,4 +100,17 @@ export class DotnetCli {
     const p = Object.entries(props).map(([k, v]) => `-p:${k}=${v}`);
     return (await this.run(['msbuild', project, `-getProperty:${name}`, ...p], dirname(project), MSBUILD_EVAL_TIMEOUT_MS)).trim();
   }
+
+  async getProperties(project: string, names: string[]): Promise<Record<string, string>> {
+    if (names.length === 0) return {}; // msbuild without -getProperty would run a full build
+    const out = (await this.run(['msbuild', project, ...names.map((n) => `-getProperty:${n}`)], dirname(project), MSBUILD_EVAL_TIMEOUT_MS)).trim();
+    const result: Record<string, string> = Object.fromEntries(names.map((n) => [n, '']));
+    if (names.length === 1 && !out.startsWith('{')) {
+      result[names[0]] = out;
+      return result;
+    }
+    const props = (JSON.parse(out) as { Properties?: Record<string, string> }).Properties ?? {};
+    for (const n of names) result[n] = props[n] ?? '';
+    return result;
+  }
 }

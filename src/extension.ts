@@ -10,6 +10,8 @@ import { findDotnet } from './dotnet/locate';
 import { createOutput } from './output';
 import { PanelManager, type PanelTestHooks } from './panel/PanelManager';
 import type { ToHost } from './panel/protocol';
+import { registerPropertiesCommands } from './properties/commands';
+import { registerSyncCommands } from './sync/command';
 import { registerFileCommands } from './solution/commands/fileCommands';
 import { registerRunCommands } from './solution/commands/run';
 import { registerSecretsCommands } from './solution/commands/secrets';
@@ -17,13 +19,27 @@ import { registerSolutionCommands } from './solution/commands/solution';
 import { setConfirmOverride } from './solution/confirm';
 import { SolutionTreeProvider } from './solution/SolutionTreeProvider';
 import type { SolutionTreeCore } from './solution/treeCore';
+import type { PropertiesController } from './properties/controller';
+import type { PropsToWebview } from './properties/protocol';
+import type { SyncPlan } from './sync/plan';
+import type { TreeNode } from './solution/model';
 import { selectTargets } from './workspace/targets';
 
 /** Returned from activate() for the integration tests; production code never sets the hooks. */
 export interface ExtensionApi extends PanelTestHooks {
   send(targetPath: string, msg: ToHost): Promise<void>;
+  /** Test mode only: Sync Namespaces applies without the refactor preview. */
+  syncSkipConfirmation?: boolean;
   /** Solution Explorer hooks (Test mode only). `run` executes `csharpWorkbench.<command>`. */
   solution?: { core: SolutionTreeCore; run(command: string, ...args: unknown[]): Promise<unknown> };
+  /** Project Properties hooks (Test mode only). `onPost` observes every message sent to a panel. */
+  properties?: {
+    open(projectPath: string): Promise<void>;
+    controllerFor(projectPath: string): PropertiesController | undefined;
+    onPost?: (m: PropsToWebview) => void;
+  };
+  /** Sync Namespaces hooks (Test mode only): computes the plan for a project node or path without applying it. */
+  sync?: { plan(nodeOrPath?: TreeNode | string): Promise<{ plan: SyncPlan; texts: Map<string, string> } | undefined> };
 }
 
 const exists = (p: string) => fsp.access(p).then(() => true, () => false);
@@ -166,6 +182,23 @@ export function activate(context: vscode.ExtensionContext): ExtensionApi | undef
 
   context.subscriptions.push(...registerSecretsCommands({
     getCli: async () => { const d = await resolveDotnet(); return d ? new DotnetCli(nodeExec, d, output) : undefined; },
+  }));
+
+  context.subscriptions.push(...registerPropertiesCommands({
+    onPost: (m) => api?.properties?.onPost?.(m),
+    expose: (hooks) => { if (api) api.properties = { ...hooks, onPost: api.properties?.onPost }; },
+    ws: context.workspaceState,
+    extensionUri: context.extensionUri,
+    provider: explorer,
+    getCli: async () => { const d = await resolveDotnet(); return d ? new DotnetCli(nodeExec, d, output) : undefined; },
+  }));
+
+  context.subscriptions.push(...registerSyncCommands({
+    provider: explorer,
+    output,
+    getCli: async () => { const d = await resolveDotnet(); return d ? new DotnetCli(nodeExec, d, output) : undefined; },
+    skipConfirmation: () => api?.syncSkipConfirmation === true,
+    expose: (plan) => { if (api) api.sync = { plan }; },
   }));
 
   context.subscriptions.push(
