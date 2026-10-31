@@ -1,7 +1,7 @@
 {
   "name": "csharp-workbench",
   "displayName": "C# Workbench",
-  "description": "A Visual Studio-style NuGet package manager for .NET solutions and projects in VS Code.",
+  "description": "Visual Studio-style tools for .NET in VS Code: NuGet package manager, Solution Explorer, Project Properties, launch profiles and Sync Namespaces.",
   "version": "0.3.0",
   "publisher": "TODO-publisher",
   "engines": {

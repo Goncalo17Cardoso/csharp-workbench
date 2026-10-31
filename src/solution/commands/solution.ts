@@ -72,7 +72,7 @@ export function registerSolutionCommands(deps: Deps): vscode.Disposable[] {
     return out;
   };
 
-  /** Edits the solution text in place through the validated Task 3 writer. */
+  /** Edits the solution text in place through the validated solution-folder writer (slnWriter.ts). */
   async function editSolution(cli: DotnetCli, sln: string, edit: (text: string, kind: SolutionModel['kind']) => string): Promise<void> {
     const text = await nodeSolutionFs.readFile(sln);
     const kind = sln.toLowerCase().endsWith('.slnx') ? 'slnx' : 'sln';

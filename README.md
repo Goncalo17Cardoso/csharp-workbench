@@ -1,10 +1,16 @@
 # C# Workbench
 
-A Visual Studio-style NuGet package manager for .NET solutions and projects in VS Code, for macOS and Linux. It works without C# Dev Kit.
+Visual Studio-style tools for .NET in VS Code, for macOS and Linux. It works without C# Dev Kit.
 
-<!-- TODO: add screenshot of the NuGet panel (media/screenshot.png) before publishing -->
+- **NuGet package manager**: browse, install, update and consolidate packages across a solution.
+- **Solution Explorer**: the solution as Visual Studio shows it, with an Add menu for classes, items, projects and references.
+- **Project Properties**: a page for the `.csproj` settings, showing the values MSBuild actually uses.
+- **Launch profiles**: edit `launchSettings.json` and run or debug with the active profile.
+- **Sync Namespaces**: fix namespaces after moving files, with a refactor preview.
 
-## Features
+How it is built is described in [ARCHITECTURE.md](ARCHITECTURE.md).
+
+## NuGet package manager
 
 A "NuGet: <solution>" editor tab with four views and a detail pane:
 
@@ -74,7 +80,9 @@ Sync skips, and lists in the "C# Workbench" Output channel, files that contain `
 
 ## Usage
 
-Right-click a `.sln`, `.slnx` or `.csproj` file in the Explorer and choose **Manage NuGet Packages…**, or run **C# Workbench: Manage NuGet Packages…** from the Command Palette.
+- **NuGet**: right-click a `.sln`, `.slnx` or `.csproj` file in the Explorer and choose **Manage NuGet Packages…**, or run **C# Workbench: Manage NuGet Packages…** from the Command Palette.
+- **Solution Explorer**: click the C# Workbench icon in the activity bar. If the folder has several solutions, pick one from the view title.
+- **Properties, launch profiles and Sync Namespaces**: right-click a project in the Solution Explorer.
 
 ## Requirements
 

@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { ALL_PROPERTIES, FIELDS, validateIdentifierPath, validateTfm, validateVersion } from '../../../src/properties/schema';
 
 describe('schema', () => {
-  it('FIELDS covers spec sections in order', () => {
+  it('FIELDS lists every section in order', () => {
     const bySection: Record<string, string[]> = {};
     for (const f of FIELDS) (bySection[f.section] ??= []).push(f.property);
     expect(bySection).toEqual({
