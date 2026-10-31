@@ -3,7 +3,15 @@
   "displayName": "C# Workbench",
   "description": "Visual Studio-style tools for .NET in VS Code: NuGet package manager, Solution Explorer, Project Properties, launch profiles and Sync Namespaces.",
   "version": "0.3.0",
-  "publisher": "TODO-publisher",
+  "publisher": "Goncalo17Cardoso",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Goncalo17Cardoso/csharp-workbench.git"
+  },
+  "homepage": "https://github.com/Goncalo17Cardoso/csharp-workbench#readme",
+  "bugs": {
+    "url": "https://github.com/Goncalo17Cardoso/csharp-workbench/issues"
+  },
   "engines": {
     "vscode": "^1.95.0"
   },
@@ -17,7 +25,7 @@
     "test:int": "node scripts/vscode-test-safe.mjs",
     "build:test": "node esbuild.mjs --tests",
     "vscode:prepublish": "npm run build",
-    "package": "npm run build && vsce package --allow-missing-repository"
+    "package": "npm run build && vsce package"
   },
   "dependencies": {
     "dompurify": "^3.4.17",

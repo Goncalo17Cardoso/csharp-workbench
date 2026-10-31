@@ -5,6 +5,7 @@
 !dist/webview/properties.js
 !dist/webview/properties.css
 !media/icon.png
+!media/solution-explorer.svg
 !l10n/**
 !package.nls.json
 !README.md
