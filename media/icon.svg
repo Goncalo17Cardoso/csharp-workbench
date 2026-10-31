@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#6B3FE0"/><stop offset="1" stop-color="#3A1C9C"/>
+    </linearGradient>
+  </defs>
+  <rect x="8" y="8" width="240" height="240" rx="52" fill="url(#bg)"/>
+  <!-- solution tree -->
+  <g fill="none" stroke="#FFFFFF" stroke-opacity="0.55" stroke-width="7" stroke-linecap="round">
+    <path d="M58 70 V168 M58 104 H82 M58 136 H82 M58 168 H82"/>
+  </g>
+  <rect x="42" y="50" width="32" height="24" rx="6" fill="#FFFFFF"/>
+  <rect x="86" y="94" width="22" height="20" rx="5" fill="#FFFFFF" fill-opacity="0.8"/>
+  <rect x="86" y="126" width="22" height="20" rx="5" fill="#FFFFFF" fill-opacity="0.8"/>
+  <rect x="86" y="158" width="22" height="20" rx="5" fill="#FFFFFF" fill-opacity="0.8"/>
+  <!-- C# -->
+  <text x="160" y="190" text-anchor="middle" font-family="-apple-system, 'SF Pro Display', 'Helvetica Neue', Arial, sans-serif" font-weight="800" font-size="112" fill="#FFFFFF">C</text>
+  <g stroke="#FFFFFF" stroke-width="7.5" stroke-linecap="round">
+    <path d="M206 56 L201 92 M222 56 L217 92 M195 67 H229 M193 81 H227"/>
+  </g>
+</svg>

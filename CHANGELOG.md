@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.3.1
+
+- Fix: launch profiles created by `dotnet new` (saved with a UTF-8 BOM) were reported as invalid JSON and could not be edited. The BOM is now accepted and kept.
+- Fix: the Solution Explorer icon is now included in the package.
+- Buttons on the Project Properties page follow the VS Code theme.
+- New extension icon and screenshots.
+
 ## 0.3.0
 
 - Project Properties page (Application, Build, Package, Assembly, Debug): evaluated values, inherited vs. set in the `.csproj`, Reset, multi-target frameworks, read-only conditional properties.

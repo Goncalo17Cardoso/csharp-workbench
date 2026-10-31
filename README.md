@@ -10,7 +10,11 @@ Visual Studio-style tools for .NET in VS Code, for macOS and Linux. It works wit
 
 How it is built is described in [ARCHITECTURE.md](ARCHITECTURE.md).
 
+![Solution Explorer with the project context menu](media/screenshots/solution-explorer.png)
+
 ## NuGet package manager
+
+![NuGet package manager](media/screenshots/nuget.png)
 
 A "NuGet: <solution>" editor tab with four views and a detail pane:
 
@@ -48,6 +52,8 @@ Everything above uses the CLI and never edits `.sln`, `.slnx` or `.csproj` text 
 
 ## Project Properties
 
+![Project Properties, Build section](media/screenshots/properties.png)
+
 Right-click a project in the Solution Explorer and choose **Properties** (or run **C# Workbench: Project Properties** from the Command Palette) for a Visual Studio-style page with Application, Build, Package, Assembly and Debug sections. Values are the ones MSBuild evaluates (`dotnet msbuild -getProperty`), so properties that come from `Directory.Build.props` show as **inherited**; editing one creates an override in the `.csproj`, and **Reset** removes it again.
 
 - Choosing more than one Target framework swaps `TargetFramework` for `TargetFrameworks` in a single write.
@@ -66,6 +72,8 @@ The `dotnet` CLI cannot change MSBuild properties, so this is the second place (
 - After writing, `dotnet msbuild -getProperty` (with restore) must evaluate each edited property to the requested value (or, for Reset, no longer take it from the `.csproj`). If it does not, the original is restored and the error is shown.
 
 ## Launch Profiles
+
+![Launch profile editor](media/screenshots/launch-profiles.png)
 
 The Debug section of the Properties page edits `Properties/launchSettings.json`: create, duplicate, rename and delete profiles, and edit command line arguments, working directory, application URL, launch browser and URL, executable path and environment variables. The file is edited with minimal changes (`jsonc-parser`), so comments and formatting are kept, and written atomically. It is created when you add the first profile.
 
