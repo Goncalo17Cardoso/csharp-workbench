@@ -1,8 +1,7 @@
 // Host-side logic of the Project Properties panel. Pure: no vscode import.
-import { parse, type ParseError } from 'jsonc-parser';
 import { ChangedOnDiskError, writeTextAtomically } from '../core/atomicWrite';
 import { resolveActiveProfile } from '../launch/activeProfile';
-import { applyProfileAction, launchSettingsPath, parseProfiles, ProfileError, type ProfileAction } from '../launch/launchSettings';
+import { applyProfileAction, isValidLaunchSettings, launchSettingsPath, parseProfiles, ProfileError, type ProfileAction } from '../launch/launchSettings';
 import { loadProperties, saveProperties, type PropertiesDeps, type PropertiesModel } from './model';
 import type { PropertyEdit } from './csprojEdit';
 import type { LaunchProfilesView, PropsToHost, PropsToWebview } from './protocol';
@@ -171,9 +170,7 @@ export class PropertiesController {
   private postProfiles(): void {
     const profiles = parseProfiles(this.launchText);
     const active = resolveActiveProfile(profiles, this.deps.launch.getActive())?.name;
-    const errors: ParseError[] = [];
-    const root: unknown = this.launchText?.trim() ? parse(this.launchText, errors, { allowTrailingComma: true }) : {};
-    const invalid = errors.length > 0 || typeof root !== 'object' || root === null || Array.isArray(root);
+    const invalid = !isValidLaunchSettings(this.launchText);
     const model: LaunchProfilesView = {
       profiles, path: this.launchPath, exists: this.launchText !== undefined,
       ...(active ? { active } : {}),

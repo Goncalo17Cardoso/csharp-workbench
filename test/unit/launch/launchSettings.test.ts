@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { applyProfileAction, launchSettingsPath, parseProfiles, ProfileError } from '../../../src/launch/launchSettings';
+import { applyProfileAction, isValidLaunchSettings, launchSettingsPath, parseProfiles, ProfileError } from '../../../src/launch/launchSettings';
 
 const sample = `{
   // top comment
@@ -21,6 +21,21 @@ describe('launchSettings', () => {
     expect(p[2].launchBrowser).toBe(true);
   });
   it('tolerates comments and trailing commas', () => expect(parseProfiles(sample)).toHaveLength(3));
+  it('accepts a UTF-8 BOM, as written by dotnet new, and keeps it on edit', () => {
+    const bom = '\uFEFF{\r\n  "profiles": {\r\n    "http": { "commandName": "Project" }\r\n  }\r\n}\r\n';
+    expect(parseProfiles(bom).map((p) => p.name)).toEqual(['http']);
+    const out = applyProfileAction(bom, { kind: 'set', name: 'http', field: 'commandLineArgs', value: '-v' });
+    expect(out.startsWith('\uFEFF{\r\n')).toBe(true);
+    expect(out.indexOf('\uFEFF', 1)).toBe(-1);
+    expect(parseProfiles(out)[0].commandLineArgs).toBe('-v');
+  });
+  it('isValidLaunchSettings accepts BOM, comments and no file, rejects malformed or non-object text', () => {
+    expect(isValidLaunchSettings('\uFEFF{"profiles":{}}')).toBe(true);
+    expect(isValidLaunchSettings(sample)).toBe(true);
+    expect(isValidLaunchSettings(undefined)).toBe(true);
+    expect(isValidLaunchSettings('garbage{')).toBe(false);
+    expect(isValidLaunchSettings('[]')).toBe(false);
+  });
   it('undefined, {} and {"profiles":5} give []', () => {
     expect(parseProfiles(undefined)).toEqual([]);
     expect(parseProfiles('{}')).toEqual([]);

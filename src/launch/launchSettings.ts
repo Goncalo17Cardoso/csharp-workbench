@@ -39,8 +39,20 @@ export function launchSettingsPath(projectPath: string): string {
 const isObj = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
 const str = (v: unknown) => (typeof v === 'string' ? v : undefined);
 
+// `dotnet new` writes launchSettings.json with a UTF-8 BOM, which jsonc-parser reports as an error.
+const BOM = '\uFEFF';
+const stripBom = (t: string) => (t.startsWith(BOM) ? t.slice(1) : t);
+
+/** True when the text is empty (no file yet) or a JSON object, allowing comments, trailing commas and a BOM. */
+export function isValidLaunchSettings(text: string | undefined): boolean {
+  if (!text?.trim()) return true;
+  const errors: ParseError[] = [];
+  return isObj(parse(stripBom(text), errors, { allowTrailingComma: true })) && errors.length === 0;
+}
+
 export function parseProfiles(text: string | undefined): LaunchProfile[] {
   if (!text) return [];
+  text = stripBom(text);
   let root: unknown;
   try { root = parse(text, [], { allowTrailingComma: true }); } catch { return []; }
   if (!isObj(root) || !isObj(root.profiles)) return [];
@@ -69,6 +81,8 @@ function detectFormat(text: string): FormattingOptions {
 }
 
 export function applyProfileAction(text: string | undefined, action: ProfileAction): string {
+  const bom = text?.startsWith(BOM) ? BOM : '';
+  if (bom) text = stripBom(text!);
   let src = text && text.trim() ? text : '{"profiles":{}}';
   const errors: ParseError[] = [];
   const parsed = parse(src, errors, { allowTrailingComma: true });
@@ -124,5 +138,5 @@ export function applyProfileAction(text: string | undefined, action: ProfileActi
       edit(['profiles', action.name, 'environmentVariables'], action.env);
       break;
   }
-  return src;
+  return bom + src;
 }
