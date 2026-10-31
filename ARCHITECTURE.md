@@ -1,6 +1,6 @@
 # Architecture
 
-C# Workbench is a VS Code extension written in TypeScript. This document explains how it is organised and the rules the code follows. For what the extension does, see the [README](README.md).
+C# Workbench Studio is a VS Code extension written in TypeScript. This document explains how it is organised and the rules the code follows. For what the extension does, see the [README](README.md).
 
 ## Principles
 

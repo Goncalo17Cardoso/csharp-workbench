@@ -13,7 +13,7 @@ import { debugConfigFor, dotnetTask } from '../../src/solution/runCore';
 import { createPropertiesFixture, type PropertiesFixture } from './helpers/fixtures';
 
 const exists = (p: string) => fs.access(p).then(() => true, () => false);
-const ourExtension = () => vscode.extensions.all.find((e) => e.packageJSON?.name === 'csharp-workbench') as
+const ourExtension = () => vscode.extensions.all.find((e) => e.packageJSON?.name === 'csharp-workbench-studio') as
   vscode.Extension<ExtensionApi> | undefined;
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 

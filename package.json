@@ -1,6 +1,6 @@
 {
-  "name": "csharp-workbench",
-  "displayName": "C# Workbench",
+  "name": "csharp-workbench-studio",
+  "displayName": "C# Workbench Studio",
   "description": "Visual Studio-style tools for .NET in VS Code: NuGet package manager, Solution Explorer, Project Properties, launch profiles and Sync Namespaces.",
   "version": "0.3.0",
   "publisher": "Goncalo17Cardoso",
