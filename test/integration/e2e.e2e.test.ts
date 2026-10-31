@@ -12,7 +12,7 @@ import { createFixtureSolution, type FixtureSolution } from './helpers/fixtures'
 
 const exists = (p: string) => fs.access(p).then(() => true, () => false);
 /** Looked up by package name so the test does not depend on the publisher id. */
-const ourExtension = () => vscode.extensions.all.find((e) => e.packageJSON?.name === 'csharp-workbench') as
+const ourExtension = () => vscode.extensions.all.find((e) => e.packageJSON?.name === 'csharp-workbench-studio') as
   vscode.Extension<ExtensionApi> | undefined;
 type Posted = { m: ToWebview; t: number };
 

@@ -1,4 +1,4 @@
-# C# Workbench
+# C# Workbench Studio
 
 Visual Studio-style tools for .NET in VS Code, for macOS and Linux. It works without C# Dev Kit.
 
