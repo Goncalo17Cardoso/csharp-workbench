@@ -1,4 +1,4 @@
-// Field list of the Project Properties page (spec §2.1). Pure: validators return an l10n
+// Field list of the Project Properties page. Pure: validators return an l10n
 // key (the English message) or undefined; the adapter translates it.
 import { toIdentifier } from '../solution/identifier';
 

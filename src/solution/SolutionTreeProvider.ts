@@ -209,7 +209,7 @@ export class SolutionTreeProvider implements vscode.TreeDataProvider<TreeNode>, 
     if (element) return this.core.children(element);
     const roots = await this.core.roots();
     const sols = (await this.core.targets()).filter((t) => t.kind !== 'csproj');
-    // Only a loaded .sln/.slnx counts: loose .csproj files hide the solution-only menus (spec §7a).
+    // Only a loaded .sln/.slnx counts: loose .csproj files hide the solution-only menus.
     void vscode.commands.executeCommand('setContext', 'csharpWorkbench.hasSolution', !!this.core.solutionPath);
     void vscode.commands.executeCommand('setContext', 'csharpWorkbench.multipleSolutions', sols.length > 1);
     return roots;
